@@ -6,7 +6,7 @@ What’s included
 - Adds selected files as books (title from filename, author empty).
 
 Run
-- Prereqs: .NET 8 SDK
+- Prereqs: .NET 9 SDK
 - Build/Run: `dotnet run`
 
 Usage
