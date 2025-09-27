@@ -17,6 +17,7 @@ open Avalonia.Controls
 open Avalonia.FuncUI
 open Avalonia.FuncUI.DSL
 open Avalonia.Layout
+open Avalonia.Platform.Storage
 open Microsoft.Data.Sqlite
 
 module Data =
@@ -322,32 +323,52 @@ type MainWindow() as this =
                                                             Button.create [ DockPanel.dock Dock.Left
                                                                             Button.content "Add book(s)"
                                                                             Button.onClick (fun _ ->
-                                                                                let ofd =
-                                                                                    OpenFileDialog(AllowMultiple = true)
+                                                                                async {
+                                                                                    let options =
+                                                                                        FilePickerOpenOptions()
 
-                                                                                ofd.Filters.Add(
-                                                                                    FileDialogFilter(
-                                                                                        Name = "E-books",
-                                                                                        Extensions =
-                                                                                            Collections.Generic.List<string>(
-                                                                                                [ "epub"
-                                                                                                  "pdf"
-                                                                                                  "mobi"
-                                                                                                  "azw3" ]
+                                                                                    options.AllowMultiple <- true
+
+                                                                                    let ebookType =
+                                                                                        FilePickerFileType "E-books"
+
+                                                                                    ebookType.Patterns <-
+                                                                                        Collections.Generic.List<string>(
+                                                                                            [ "*.epub"
+                                                                                              "*.pdf"
+                                                                                              "*.mobi"
+                                                                                              "*.azw3" ]
+                                                                                        )
+
+                                                                                    options.FileTypeFilter <-
+                                                                                        Collections.Generic.List<FilePickerFileType>(
+                                                                                            [ ebookType ]
+                                                                                        )
+
+                                                                                    let! storageFiles =
+                                                                                        this
+                                                                                            .StorageProvider
+                                                                                            .OpenFilePickerAsync(
+                                                                                                options
                                                                                             )
-                                                                                    )
-                                                                                )
+                                                                                        |> Async.AwaitTask
 
-                                                                                let files =
-                                                                                    ofd.ShowAsync(this)
-                                                                                    |> Async.AwaitTask
-                                                                                    |> Async.RunSynchronously
+                                                                                    storageFiles
+                                                                                    |> Seq.choose (fun file ->
+                                                                                        let path =
+                                                                                            file.TryGetLocalPath()
 
-                                                                                let files =
-                                                                                    if isNull files then [||] else files
+                                                                                        if
+                                                                                            String.IsNullOrWhiteSpace
+                                                                                                path then
+                                                                                            None
+                                                                                        else
+                                                                                            Some path)
+                                                                                    |> Seq.iter addFromPath
 
-                                                                                files |> Array.iter addFromPath
-                                                                                refreshAndMarkMissing ()) ]
+                                                                                    refreshAndMarkMissing ()
+                                                                                }
+                                                                                |> Async.StartImmediate) ]
                                                             TextBlock.create [ DockPanel.dock Dock.Right
                                                                                TextBlock.text "Minimal Library (MVP)"
                                                                                TextBlock.verticalAlignment
@@ -485,7 +506,7 @@ type App() =
 
     override this.Initialize() =
         this.Styles.Add(FluentTheme())
-        this.RequestedThemeVariant <- Styling.ThemeVariant.Dark
+        this.RequestedThemeVariant <- Styling.ThemeVariant.Light
 
     override this.OnFrameworkInitializationCompleted() =
         match this.ApplicationLifetime with
