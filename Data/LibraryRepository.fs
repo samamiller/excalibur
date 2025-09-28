@@ -142,7 +142,7 @@ module LibraryRepository =
         use r = cmd.ExecuteReader()
         readBooks r
 
-    let addBook (title: string) (author: string option) (path: string) =
+    let addBook (title: string) (author: string option) (path: string) : bool =
         use conn = new SqliteConnection(connectionString)
         conn.Open()
         // Ignore if book with same path already exists
@@ -159,7 +159,7 @@ module LibraryRepository =
             | _ -> true
 
         if exists then
-            ()
+            false
         else
             use cmd = conn.CreateCommand()
             cmd.CommandText <- "insert into books(title,author,path,added_at,checksum) values ($t,$a,$p,$d,$c)"
@@ -202,7 +202,8 @@ module LibraryRepository =
 
             cmd.Parameters.Add(cParam) |> ignore
 
-            cmd.ExecuteNonQuery() |> ignore
+            let rows = cmd.ExecuteNonQuery()
+            rows > 0
 
     let setMissing (id: int) (missing: bool) =
         use conn = new SqliteConnection(connectionString)

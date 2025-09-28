@@ -14,6 +14,7 @@ open Excalibur.Domain
 open Excalibur.Services
 open Excalibur.Views.TopBar
 open Excalibur.Views.BookList
+open Excalibur.Views.BookGrid
 open Excalibur.Views.EditBar
 open Excalibur.Views.TagBrowser
 open Excalibur.Views.BookDetails
@@ -35,12 +36,13 @@ type MainWindow() as this =
                 let query = ctx.useState ""
                 let selectedIds = ctx.useState ([]: int list)
                 let theme = ctx.useState "Light"
+                let status = ctx.useState (None: string option)
 
                 let filteredBooks =
                     let books = booksState.Current
 
                     if String.IsNullOrWhiteSpace query.Current then
-                        books
+                        books |> List.sortBy (fun b -> b.title.ToLowerInvariant())
                     else
                         let q = query.Current.Trim().ToLowerInvariant()
 
@@ -50,10 +52,14 @@ type MainWindow() as this =
                             || (b.author
                                 |> Option.defaultValue ""
                                 |> fun a -> a.ToLowerInvariant().Contains q))
+                        |> List.sortBy (fun b -> b.title.ToLowerInvariant())
 
                 let refreshBooks () =
-                    booksState.Set(loadBooks ())
+                    let loaded = loadBooks ()
+                    booksState.Set loaded
                     selectedIds.Set []
+                    // Show a small debug status of loaded count
+                    status.Set (Some (sprintf "Loaded %d from DB" (loaded |> List.length)))
 
                 let addFromPath (file: string) =
                     LibraryService.addBookFromPath file None
@@ -109,6 +115,9 @@ type MainWindow() as this =
                                         this.StorageProvider.OpenFilePickerAsync(options)
                                         |> Async.AwaitTask
 
+                                    let mutable added = 0
+                                    let mutable skipped = 0
+
                                     storageFiles
                                     |> Seq.choose (fun file ->
                                         let path = file.TryGetLocalPath()
@@ -117,9 +126,15 @@ type MainWindow() as this =
                                             None
                                         else
                                             Some path)
-                                    |> Seq.iter addFromPath
+                                    |> Seq.iter (fun p ->
+                                        if LibraryService.addBookFromPath p None then added <- added + 1 else skipped <- skipped + 1)
 
+                                    // Clear filters so newly added books are visible
+                                    query.Set ""
                                     refreshAndMarkMissing ()
+                                    // Extra refresh to ensure UI state updates after DB ops
+                                    booksState.Set(loadBooks ())
+                                    status.Set (Some (sprintf "Added %d, skipped %d" added skipped))
                                 }
                                 |> Async.StartImmediate)
                           OnImportFolder =
@@ -150,31 +165,44 @@ type MainWindow() as this =
 
                                         do! e.DisposeAsync().AsTask() |> Async.AwaitTask
 
-                                        acc
-                                        |> Seq.choose (fun (it: IStorageItem) ->
-                                            match it with
-                                            | :? IStorageFile as sf ->
-                                                let path = sf.TryGetLocalPath()
+                                        let rec isBookFile (path: string) =
+                                            let ext = System.IO.Path.GetExtension(path).ToLowerInvariant()
+                                            [ ".epub"; ".pdf"; ".mobi"; ".azw3" ] |> List.contains ext
 
-                                                if String.IsNullOrWhiteSpace path then
-                                                    None
-                                                else
-                                                    let ext =
-                                                        System
-                                                            .IO
-                                                            .Path
-                                                            .GetExtension(path)
-                                                            .ToLowerInvariant()
+                                        let rec enumerate (folder: IStorageFolder) = task {
+                                            let items = folder.GetItemsAsync()
+                                            let e = items.GetAsyncEnumerator()
+                                            let mutable results : string list = []
+                                            let mutable hasNext = true
+                                            while hasNext do
+                                                let! moved = e.MoveNextAsync().AsTask()
+                                                if moved then
+                                                    match e.Current with
+                                                    | :? IStorageFile as f ->
+                                                        let p = f.TryGetLocalPath()
+                                                        if not (String.IsNullOrWhiteSpace p) && isBookFile p then
+                                                            results <- p :: results
+                                                    | :? IStorageFolder as sub ->
+                                                        let! subFiles = enumerate sub
+                                                        results <- List.append subFiles results
+                                                    | _ -> ()
+                                                else hasNext <- false
+                                            do! e.DisposeAsync().AsTask()
+                                            return results }
 
-                                                    if [ ".epub"; ".pdf"; ".mobi"; ".azw3" ]
-                                                       |> List.contains ext then
-                                                        Some path
-                                                    else
-                                                        None
-                                            | _ -> None)
-                                        |> Seq.iter addFromPath
+                                        let! files = enumerate folder |> Async.AwaitTask
 
+                                        let mutable added = 0
+                                        let mutable skipped = 0
+                                        files |> List.iter (fun p ->
+                                            if LibraryService.addBookFromPath p None then added <- added + 1 else skipped <- skipped + 1)
+
+                                        // Clear filters so newly imported books are visible
+                                        query.Set ""
                                         refreshAndMarkMissing ()
+                                        // Extra refresh to ensure UI state updates after DB ops
+                                        booksState.Set(loadBooks ())
+                                        status.Set (Some (sprintf "Added %d, skipped %d" added skipped))
                                 }
                                 |> Async.StartImmediate)
                           Theme = theme.Current
@@ -190,7 +218,8 @@ type MainWindow() as this =
 
                                 match next with
                                 | "Dark" -> this.RequestedThemeVariant <- Avalonia.Styling.ThemeVariant.Dark
-                                | _ -> this.RequestedThemeVariant <- Avalonia.Styling.ThemeVariant.Light) }
+                                | _ -> this.RequestedThemeVariant <- Avalonia.Styling.ThemeVariant.Light)
+                          Status = status.Current }
                 // Keyboard delete removes selected books
                 this.KeyDown.Add (fun e ->
                     if
@@ -208,10 +237,36 @@ type MainWindow() as this =
                              |> List.tryFind (fun b -> b.id = id)
                          | [] -> None)
 
-                let bookListView =
-                    BookList.view
-                        { Books = filteredBooks
-                          OnSelectionChanged = selectedIds.Set }
+                let initialColumns : Excalibur.Views.BookGrid.ColumnConfig list =
+                    [ { Id = ColumnId.Title; Header = "Title" }
+                      { Id = ColumnId.Author; Header = "Author" }
+                      { Id = ColumnId.ColTags; Header = "Tags" }
+                      { Id = ColumnId.Added; Header = "Added" }
+                      { Id = ColumnId.Missing; Header = "Missing" } ]
+
+                let columnsState = ctx.useState initialColumns
+
+                let bookListView : Types.IView =
+                    // Working fallback: simple ListBox rendering of Title — Author
+                    ListBox.create [
+                        ListBox.dataItems filteredBooks
+                        ListBox.itemTemplate (
+                            DataTemplateView<Excalibur.Domain.Book>.create (fun b ->
+                                let line = sprintf "%s — %s" b.title (defaultArg b.author "")
+                                TextBlock.create [ TextBlock.text line ]
+                            )
+                        )
+                        ListBox.onSelectionChanged (fun args ->
+                            match args.Source with
+                            | :? ListBox as lb ->
+                                lb.SelectedItems
+                                |> Seq.cast<Excalibur.Domain.Book>
+                                |> Seq.map (fun b -> b.id)
+                                |> Seq.toList
+                                |> selectedIds.Set
+                            | _ -> ()
+                        )
+                    ]
 
                 let editBar = EditBar.view { OnBatchEdit = handleBatchEdit }
 
@@ -238,8 +293,16 @@ type MainWindow() as this =
                                                                                                           tagBrowser ] ] ]
                                                   Grid.create [ Grid.row 1
                                                                 Grid.column 1
-                                                                Grid.children [ ScrollViewer.create [ ScrollViewer.content
-                                                                                                          bookListView ] ] ]
+                                                                Grid.children [
+                                                                    // Count + simple mirror list to validate data feed
+                                                                    StackPanel.create [ StackPanel.spacing 6.0
+                                                                                        StackPanel.children [
+                                                                                            TextBlock.create [ TextBlock.text (sprintf "Books: %d" (filteredBooks |> List.length)) ]
+                                                                                            // Temporary mirror list to validate items rendering path
+                                                                                            ListBox.create [ ListBox.height 0.0 ]
+                                                                                            bookListView
+                                                                                        ] ]
+                                                                ] ]
                                                   Grid.create [ Grid.row 1
                                                                 Grid.column 2
                                                                 Grid.children [ Border.create [ Border.child detailsPane ] ] ] ] ]

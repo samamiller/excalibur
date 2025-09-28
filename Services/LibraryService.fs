@@ -9,7 +9,7 @@ module LibraryService =
 
     let loadBooks () = LibraryRepository.getBooks ()
 
-    let addBookFromPath (path: string) (author: string option) =
+    let addBookFromPath (path: string) (author: string option) : bool =
         let title = Path.GetFileNameWithoutExtension path
         LibraryRepository.addBook title author path
 

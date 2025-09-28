@@ -25,6 +25,8 @@
     <Compile Include="Dialogs/EditMetadataDialog.fs" />
     <Compile Include="Views/TopBar.fs" />
     <Compile Include="Views/BookList.fs" />
+    <Compile Include="Views/BookGrid.fs" />
+    <!-- Removed temporary BookTable to fix build -->
     <Compile Include="Views/EditBar.fs" />
     <Compile Include="Views/TagBrowser.fs" />
     <Compile Include="Views/BookDetails.fs" />
