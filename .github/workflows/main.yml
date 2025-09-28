@@ -1,0 +1,42 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-on-ubuntu:
+    runs-on: ubuntu-latest 
+
+    steps:
+    - name: Checkout code 
+      uses: actions/checkout@v3
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '9.0.x' 
+
+    - name: Restore Dependencies
+      run: dotnet restore
+
+    - name: Build Application
+    run: dotnet build --configuration Release --no-restore
+
+  build-on-windows:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '9.0.x'
+
+    - name: Restore Dependencies
+      run: dotnet restore
+
+    - name: Build Application
+      run: dotnet build --configuration Release --no-restore
