@@ -145,33 +145,64 @@ module LibraryRepository =
     let addBook (title: string) (author: string option) (path: string) =
         use conn = new SqliteConnection(connectionString)
         conn.Open()
-        use cmd = conn.CreateCommand()
-        cmd.CommandText <- "insert into books(title,author,path,added_at,checksum) values ($t,$a,$p,$d,$c)"
-        cmd.Parameters.AddWithValue("$t", title) |> ignore
+        // Ignore if book with same path already exists
+        use existsCmd = conn.CreateCommand()
+        existsCmd.CommandText <- "select 1 from books where path = $p limit 1"
 
-        cmd.Parameters.AddWithValue("$a", (author |> Option.defaultValue null))
+        existsCmd.Parameters.AddWithValue("$p", path)
         |> ignore
 
-        cmd.Parameters.AddWithValue("$p", path) |> ignore
+        let exists =
+            match existsCmd.ExecuteScalar() with
+            | null -> false
+            | :? DBNull -> false
+            | _ -> true
 
-        cmd.Parameters.AddWithValue("$d", DateTime.UtcNow.ToString("o"))
-        |> ignore
+        if exists then
+            ()
+        else
+            use cmd = conn.CreateCommand()
+            cmd.CommandText <- "insert into books(title,author,path,added_at,checksum) values ($t,$a,$p,$d,$c)"
+            cmd.Parameters.AddWithValue("$t", title) |> ignore
+            // Sqlite AddWithValue does not accept null directly; parameter must exist with DBNull.Value
+            let aParam = cmd.CreateParameter()
+            aParam.ParameterName <- "$a"
 
-        let checksum =
-            try
-                use sha = System.Security.Cryptography.SHA256.Create()
-                use fs = File.OpenRead(path)
+            aParam.Value <-
+                match author with
+                | Some v -> box v
+                | None -> box DBNull.Value
 
-                sha.ComputeHash(fs)
-                |> BitConverter.ToString
-                |> fun hash -> hash.Replace("-", "").ToLowerInvariant()
-            with
-            | _ -> null
+            cmd.Parameters.Add(aParam) |> ignore
 
-        cmd.Parameters.AddWithValue("$c", checksum)
-        |> ignore
+            cmd.Parameters.AddWithValue("$p", path) |> ignore
 
-        cmd.ExecuteNonQuery() |> ignore
+            cmd.Parameters.AddWithValue("$d", DateTime.UtcNow.ToString("o"))
+            |> ignore
+
+            let checksum =
+                try
+                    use sha = System.Security.Cryptography.SHA256.Create()
+                    use fs = File.OpenRead(path)
+
+                    sha.ComputeHash(fs)
+                    |> BitConverter.ToString
+                    |> fun hash -> hash.Replace("-", "").ToLowerInvariant()
+                with
+                | _ -> null
+
+            let cParam = cmd.CreateParameter()
+            cParam.ParameterName <- "$c"
+
+            cParam.Value <-
+                if isNull checksum then
+                    box DBNull.Value
+                else
+                    box checksum
+
+            cmd.Parameters.Add(cParam) |> ignore
+
+            cmd.ExecuteNonQuery() |> ignore
 
     let setMissing (id: int) (missing: bool) =
         use conn = new SqliteConnection(connectionString)
@@ -197,13 +228,95 @@ module LibraryRepository =
             cmd.CommandText <-
                 "update books set author = COALESCE($a, author), tags = COALESCE($g, tags) where id = $id"
 
-            cmd.Parameters.AddWithValue("$a", (author |> Option.defaultValue null))
-            |> ignore
+            let aParam = cmd.CreateParameter()
+            aParam.ParameterName <- "$a"
 
-            cmd.Parameters.AddWithValue("$g", (tags |> Option.defaultValue null))
-            |> ignore
+            aParam.Value <-
+                match author with
+                | Some v -> box v
+                | None -> box DBNull.Value
+
+            cmd.Parameters.Add(aParam) |> ignore
+
+            let gParam = cmd.CreateParameter()
+            gParam.ParameterName <- "$g"
+
+            gParam.Value <-
+                match tags with
+                | Some v -> box v
+                | None -> box DBNull.Value
+
+            cmd.Parameters.Add(gParam) |> ignore
 
             cmd.Parameters.AddWithValue("$id", bid) |> ignore
             cmd.ExecuteNonQuery() |> ignore
 
         tx.Commit()
+
+    let updateMetadata
+        (id: int)
+        (title: string option)
+        (author: string option)
+        (tags: string option)
+        (comments: string option)
+        =
+        use conn = new SqliteConnection(connectionString)
+        conn.Open()
+        use cmd = conn.CreateCommand()
+
+        cmd.CommandText <-
+            "update books set title = COALESCE($t, title), author = COALESCE($a, author), tags = COALESCE($g, tags), comments = COALESCE($c, comments) where id = $id"
+
+        let tParam2 = cmd.CreateParameter()
+        tParam2.ParameterName <- "$t"
+
+        tParam2.Value <-
+            (match title with
+             | Some v -> box v
+             | None -> box DBNull.Value)
+
+        cmd.Parameters.Add(tParam2) |> ignore
+        let aParam2 = cmd.CreateParameter()
+        aParam2.ParameterName <- "$a"
+
+        aParam2.Value <-
+            (match author with
+             | Some v -> box v
+             | None -> box DBNull.Value)
+
+        cmd.Parameters.Add(aParam2) |> ignore
+        let gParam2 = cmd.CreateParameter()
+        gParam2.ParameterName <- "$g"
+
+        gParam2.Value <-
+            (match tags with
+             | Some v -> box v
+             | None -> box DBNull.Value)
+
+        cmd.Parameters.Add(gParam2) |> ignore
+        let cParam2 = cmd.CreateParameter()
+        cParam2.ParameterName <- "$c"
+
+        cParam2.Value <-
+            (match comments with
+             | Some v -> box v
+             | None -> box DBNull.Value)
+
+        cmd.Parameters.Add(cParam2) |> ignore
+        cmd.Parameters.AddWithValue("$id", id) |> ignore
+        cmd.ExecuteNonQuery() |> ignore
+
+    let deleteBooks (ids: int list) =
+        if ids.Length > 0 then
+            use conn = new SqliteConnection(connectionString)
+            conn.Open()
+            use tx = conn.BeginTransaction()
+
+            for bid in ids do
+                use cmd = conn.CreateCommand()
+                cmd.Transaction <- tx
+                cmd.CommandText <- "delete from books where id = $id"
+                cmd.Parameters.AddWithValue("$id", bid) |> ignore
+                cmd.ExecuteNonQuery() |> ignore
+
+            tx.Commit()

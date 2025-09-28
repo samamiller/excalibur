@@ -10,7 +10,10 @@ type Props =
     { Query: string
       OnQueryChanged: string -> unit
       OnClear: unit -> unit
-      OnAddBooks: unit -> unit }
+      OnAddBooks: unit -> unit
+      OnImportFolder: unit -> unit
+      Theme: string
+      OnToggleTheme: unit -> unit }
 
 let view props : Types.IView =
     let searchControls: Types.IView list =
@@ -27,12 +30,24 @@ let view props : Types.IView =
                               StackPanel.spacing 8.0
                               StackPanel.margin (Thickness 8.0)
                               StackPanel.children searchControls ]
-          Button.create [ DockPanel.dock Avalonia.Controls.Dock.Left
-                          Button.content "Add book(s)"
-                          Button.onClick (fun _ -> props.OnAddBooks()) ]
-          TextBlock.create [ DockPanel.dock Avalonia.Controls.Dock.Right
-                             TextBlock.text "Minimal Library (MVP)"
-                             TextBlock.verticalAlignment VerticalAlignment.Center ] ]
+          StackPanel.create [ DockPanel.dock Avalonia.Controls.Dock.Left
+                              StackPanel.orientation Orientation.Horizontal
+                              StackPanel.spacing 6.0
+                              StackPanel.children [ Button.create [ Button.content "Add book(s)"
+                                                                    Button.onClick (fun _ -> props.OnAddBooks()) ]
+                                                    Button.create [ Button.content "Import from Folder"
+                                                                    Button.onClick (fun _ -> props.OnImportFolder()) ] ] ]
+          StackPanel.create [ DockPanel.dock Avalonia.Controls.Dock.Right
+                              StackPanel.orientation Orientation.Horizontal
+                              StackPanel.spacing 8.0
+                              StackPanel.children [ TextBlock.create [ TextBlock.text "Theme:"
+                                                                       TextBlock.verticalAlignment
+                                                                           VerticalAlignment.Center ]
+                                                    Button.create [ Button.content (sprintf "%s" props.Theme)
+                                                                    Button.onClick (fun _ -> props.OnToggleTheme()) ]
+                                                    TextBlock.create [ TextBlock.text "Minimal Library (MVP)"
+                                                                       TextBlock.verticalAlignment
+                                                                           VerticalAlignment.Center ] ] ] ]
 
     DockPanel.create [ DockPanel.lastChildFill true
                        DockPanel.children panelChildren ]

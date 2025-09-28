@@ -24,3 +24,14 @@ module LibraryService =
     let updateAuthorTags (ids: int list) (author: string option) (tags: string option) =
         if ids.Length > 0 then
             LibraryRepository.updateAuthorTags ids author tags
+
+    let updateMetadata
+        (id: int)
+        (title: string option)
+        (author: string option)
+        (tags: string option)
+        (comments: string option)
+        =
+        LibraryRepository.updateMetadata id title author tags comments
+
+    let deleteBooks (ids: int list) = LibraryRepository.deleteBooks ids

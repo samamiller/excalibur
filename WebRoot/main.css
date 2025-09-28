@@ -1,10 +1,15 @@
 body {
     font-family: Arial, Helvetica, sans-serif;
-    color: #333;
-    font-size: .9em;
+    color: #e5e7eb;
+    background: #1b1d1f;
+    font-size: .95em;
 }
 
 h1 {
     font-size: 1.5em;
-    color: #334499;
+    color: #93c5fd;
 }
+
+.subtle { color: #9aa3af; }
+.tag-browser { background: #111214; }
+.details-pane { background: #111214; }

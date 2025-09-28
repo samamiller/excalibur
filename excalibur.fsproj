@@ -26,6 +26,8 @@
     <Compile Include="Views/TopBar.fs" />
     <Compile Include="Views/BookList.fs" />
     <Compile Include="Views/EditBar.fs" />
+    <Compile Include="Views/TagBrowser.fs" />
+    <Compile Include="Views/BookDetails.fs" />
     <Compile Include="Views/MainWindow.fs" />
     <Compile Include="App.fs" />
   </ItemGroup>
