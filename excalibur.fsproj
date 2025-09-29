@@ -11,6 +11,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Avalonia.Desktop" Version="11.1.0" />
+    <PackageReference Include="Avalonia.Controls.TreeDataGrid" Version="11.1.0" />
     <PackageReference Include="Avalonia.FuncUI" Version="1.5.1" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.1.0" />
     <PackageReference Include="Dapper.FSharp" Version="4.9.0" />
@@ -19,6 +20,7 @@
     <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.9" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="TreeDataGrid/Library.fs" />
     <Compile Include="Domain/Book.fs" />
     <Compile Include="Data/LibraryRepository.fs" />
     <Compile Include="Services/LibraryService.fs" />
