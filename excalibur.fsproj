@@ -24,6 +24,8 @@
     <Compile Include="Domain/Book.fs" />
     <Compile Include="Data/LibraryRepository.fs" />
     <Compile Include="Services/LibraryService.fs" />
+    <Compile Include="Services/Logger.fs" />
+    <Compile Include="Services/ConfigService.fs" />
     <Compile Include="Dialogs/EditMetadataDialog.fs" />
     <Compile Include="Views/TopBar.fs" />
     <Compile Include="Views/BookList.fs" />

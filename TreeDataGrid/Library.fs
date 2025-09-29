@@ -50,6 +50,9 @@ module TreeDataGrid =
             AttrBuilder<'t>
                 .CreateProperty<ITreeDataGridSource>(TreeDataGrid.SourceProperty, dataSource, ValueNone)
 
+        // Note: Avalonia TreeDataGrid doesn’t expose a dedicated SelectionChangedEvent in 11.1.
+        // Consumers should poll selection via Source.RowSelection; no event wrapper here to avoid compile errors.
+
         static member rowDragStarted<'t when 't :> TreeDataGrid>
             (
                 func: TreeDataGridRowDragStartedEventArgs -> unit,

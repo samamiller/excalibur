@@ -11,6 +11,7 @@ open Avalonia.Interactivity
 open Avalonia.Controls.Models.TreeDataGrid
 open System.Linq.Expressions
 open System.Reflection
+open Excalibur.Services
 
 // Use our FuncUI DSL wrapper for TreeDataGrid
 open Avalonia.FuncUI.DSL.TreeDataGrid
@@ -56,6 +57,14 @@ let private addedAtText (book: Book) = defaultArg book.added_at ""
 [<CompiledName("MissingText")>]
 let private missingText (book: Book) = if book.missing then "Yes" else ""
 
+// Static helpers for expression-based TextColumns (use a real class for stable MethodInfo)
+type ColumnHelpers =
+    static member TitleOf(b: Book) = b.title
+    static member AuthorOf(b: Book) = defaultArg b.author ""
+    static member TagsOf(b: Book) = defaultArg b.tags ""
+    static member AddedOf(b: Book) = defaultArg b.added_at ""
+    static member MissingOf(b: Book) = if b.missing then "Yes" else ""
+
 let private colTemplate (cfg: ColumnConfig) : Types.IView =
     match cfg.Id with
     | Title ->
@@ -92,6 +101,14 @@ let view (props: Props) : Types.IView =
         else
             props.Columns
 
+    do
+        Logger.infof "BookGrid: books=%d requestedColumns=%d" props.Books.Length props.Columns.Length
+
+        Logger.infof
+            "BookGrid: effectiveColumns=%d [%s]"
+            cols.Length
+            (String.Join(", ", (cols |> List.map (fun c -> c.Header))))
+
     // TreeDataGrid works with a Source object; we’ll create a flat hierarchical source
     // with no children (single-level tree) to mirror existing list behavior.
     let items = props.Books |> List.toArray
@@ -112,29 +129,55 @@ let view (props: Props) : Types.IView =
     let method name =
         moduleType.GetMethod(name, BindingFlags.Static ||| BindingFlags.NonPublic)
 
-    let titleColumn =
-        let mi = method "TitleText"
-        makeColumn "Title" (fun param -> Expression.Call(mi, param)) titleText
+    // Text columns using LINQ expressions for rendering; styles are provided by merged TreeDataGrid theme
+    let titleColumn: IColumn<Book> =
+        let mi =
+            typeof<ColumnHelpers>.GetMethod ("TitleOf", BindingFlags.Public ||| BindingFlags.Static)
 
-    let authorColumn =
-        let mi = method "AuthorText"
-        makeColumn "Author" (fun param -> Expression.Call(mi, param)) authorText
+        let p = Expression.Parameter(typeof<Book>, "b")
+        let body = Expression.Call(mi, p)
+        let lambda = Expression.Lambda<Func<Book, string>>(body, p)
+        TextColumn<Book, string>("Title", lambda) :> IColumn<Book>
 
-    let tagsColumn =
-        let mi = method "TagsText"
-        makeColumn "Tags" (fun param -> Expression.Call(mi, param)) tagsText
+    let authorColumn: IColumn<Book> =
+        let mi =
+            typeof<ColumnHelpers>.GetMethod ("AuthorOf", BindingFlags.Public ||| BindingFlags.Static)
 
-    let addedColumn =
-        let mi = method "AddedAtText"
-        makeColumn "Added" (fun param -> Expression.Call(mi, param)) addedAtText
+        let p = Expression.Parameter(typeof<Book>, "b")
+        let body = Expression.Call(mi, p)
+        let lambda = Expression.Lambda<Func<Book, string>>(body, p)
+        TextColumn<Book, string>("Author", lambda) :> IColumn<Book>
 
-    let missingColumn =
-        let mi = method "MissingText"
-        makeColumn "Missing" (fun param -> Expression.Call(mi, param)) missingText
+    let tagsColumn: IColumn<Book> =
+        let mi =
+            typeof<ColumnHelpers>.GetMethod ("TagsOf", BindingFlags.Public ||| BindingFlags.Static)
 
-    // Hierarchical source (single level for now) prepares us for grouping later
+        let p = Expression.Parameter(typeof<Book>, "b")
+        let body = Expression.Call(mi, p)
+        let lambda = Expression.Lambda<Func<Book, string>>(body, p)
+        TextColumn<Book, string>("Tags", lambda) :> IColumn<Book>
+
+    let addedColumn: IColumn<Book> =
+        let mi =
+            typeof<ColumnHelpers>.GetMethod ("AddedOf", BindingFlags.Public ||| BindingFlags.Static)
+
+        let p = Expression.Parameter(typeof<Book>, "b")
+        let body = Expression.Call(mi, p)
+        let lambda = Expression.Lambda<Func<Book, string>>(body, p)
+        TextColumn<Book, string>("Added", lambda) :> IColumn<Book>
+
+    let missingColumn: IColumn<Book> =
+        let mi =
+            typeof<ColumnHelpers>.GetMethod ("MissingOf", BindingFlags.Public ||| BindingFlags.Static)
+
+        let p = Expression.Parameter(typeof<Book>, "b")
+        let body = Expression.Call(mi, p)
+        let lambda = Expression.Lambda<Func<Book, string>>(body, p)
+        TextColumn<Book, string>("Missing", lambda) :> IColumn<Book>
+
+    // Flat source for single-level list; no expander column needed
     let source: ITreeDataGridSource =
-        let s = new HierarchicalTreeDataGridSource<Book>(items :> seq<Book>)
+        let s = new Avalonia.Controls.FlatTreeDataGridSource<Book>(items)
 
         let addById (id: ColumnId) =
             match id with
@@ -144,12 +187,56 @@ let view (props: Props) : Types.IView =
             | Added -> s.Columns.Add(addedColumn)
             | Missing -> s.Columns.Add(missingColumn)
 
+        let before = s.Columns.Count
         cols |> List.iter (fun c -> addById c.Id)
+        let after = s.Columns.Count
+        Logger.infof "BookGrid: addedColumns=%d totalColumns=%d" (after - before) after
         s :> ITreeDataGridSource
 
-    // TreeDataGrid selection reporting: we'll observe SelectedRows on the control when selection changes.
+    // Simple column chooser context menu (toggle visibility)
+    let columnMenu: ContextMenu =
+        let mk (cfg: ColumnConfig) =
+            let isOn = cols |> List.exists (fun c -> c.Id = cfg.Id)
+            let item = new MenuItem()
+            item.Header <- cfg.Header
+            item.IsChecked <- isOn
+
+            item.Click.Add (fun _ ->
+                let next =
+                    if isOn then
+                        cols |> List.filter (fun c -> c.Id <> cfg.Id)
+                    else
+                        cols @ [ cfg ]
+
+                props.OnColumnsChanged next)
+
+            item :> obj
+
+        let cm = new ContextMenu()
+
+        cm.ItemsSource <-
+            [ mk { Id = Title; Header = "Title" }
+              mk { Id = Author; Header = "Author" }
+              mk { Id = ColTags; Header = "Tags" }
+              mk { Id = Added; Header = "Added" }
+              mk { Id = Missing; Header = "Missing" } ]
+
+        cm
+
+    // TreeDataGrid selection reporting: project selected rows to IDs by reading the flat source
+    let onSelectionChanged (tdg: Avalonia.Controls.TreeDataGrid) =
+        match tdg.Source with
+        | :? Avalonia.Controls.FlatTreeDataGridSource<Book> as s when not (isNull s.RowSelection) ->
+            s.RowSelection.SelectedItems
+            |> Seq.map (fun b -> b.id)
+            |> Seq.toList
+            |> props.OnSelectionChanged
+        | _ -> ()
+
     TreeDataGrid.create [ TreeDataGrid.source source
-                          TreeDataGrid.showColumnHeaders true ]
+                          TreeDataGrid.showColumnHeaders true
+                          // Attach context menu for column chooser
+                          Control.contextMenu columnMenu ]
 
 // Minimal sort support: handle AutoGeneratingColumn not available; rely on DataGrid's own sort toggling.
 // For now, we expose a helper to attach a handler externally if needed.

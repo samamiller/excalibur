@@ -4,6 +4,8 @@ open Avalonia
 open Avalonia.Controls.ApplicationLifetimes
 open Avalonia.Styling
 open Avalonia.Themes.Fluent
+open Avalonia.Markup.Xaml.Styling
+open System
 open Excalibur.Views
 
 type App() =
@@ -11,6 +13,11 @@ type App() =
 
     override this.Initialize() =
         this.Styles.Add(FluentTheme())
+        // Ensure TreeDataGrid styles are available
+        this.Styles.Add(
+            StyleInclude(baseUri = null, Source = Uri("avares://Avalonia.Controls.TreeDataGrid/Themes/Fluent.axaml"))
+        )
+
         this.RequestedThemeVariant <- ThemeVariant.Light
 
     override this.OnFrameworkInitializationCompleted() =

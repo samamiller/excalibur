@@ -13,7 +13,7 @@ type Props =
       OnAddBooks: unit -> unit
       OnImportFolder: unit -> unit
       Theme: string
-      OnToggleTheme: unit -> unit
+      OnThemeToggle: unit -> unit
       Status: string option }
 
 let view props : Types.IView =
@@ -38,16 +38,22 @@ let view props : Types.IView =
                                                                     Button.onClick (fun _ -> props.OnAddBooks()) ]
                                                     Button.create [ Button.content "Import from Folder"
                                                                     Button.onClick (fun _ -> props.OnImportFolder()) ] ] ]
-          let rightChildren : Types.IView list =
+          let rightChildren: Types.IView list =
               [ match props.Status with
                 | Some s when s <> "" ->
-                    yield (TextBlock.create [ TextBlock.text s
-                                              TextBlock.verticalAlignment VerticalAlignment.Center ] :> Types.IView)
+                    yield
+                        (TextBlock.create [ TextBlock.text s
+                                            TextBlock.verticalAlignment VerticalAlignment.Center ]
+                        :> Types.IView)
                 | _ -> ()
-                yield (TextBlock.create [ TextBlock.text "Theme:"
-                                          TextBlock.verticalAlignment VerticalAlignment.Center ] :> Types.IView)
-                yield (Button.create [ Button.content (sprintf "%s" props.Theme)
-                                       Button.onClick (fun _ -> props.OnToggleTheme()) ] :> Types.IView) ]
+                yield
+                    (TextBlock.create [ TextBlock.text "Theme:"
+                                        TextBlock.verticalAlignment VerticalAlignment.Center ]
+                    :> Types.IView)
+                yield
+                    (Button.create [ Button.content (sprintf "%s" props.Theme)
+                                     Button.onClick (fun _ -> props.OnThemeToggle()) ]
+                    :> Types.IView) ]
 
           StackPanel.create [ DockPanel.dock Avalonia.Controls.Dock.Right
                               StackPanel.orientation Orientation.Horizontal
