@@ -320,6 +320,9 @@ type MainWindow() as this =
                     |> List.map (fun c -> c.Header)
                     |> ConfigService.setColumns
 
+                let sortKeyState = ctx.useState "Title"
+                let sortAscState = ctx.useState true
+
                 let bookListView: Types.IView =
                     // Use TreeDataGrid-based BookGrid
                     BookGrid.view
@@ -338,7 +341,15 @@ type MainWindow() as this =
                                 // Persist happens via the do-binding above
                                 ())
                           OnSelectionChanged = (fun ids -> selectedIds.Set ids)
-                          OnSort = (fun _ -> ()) }
+                          OnSort =
+                            (fun (key, asc) ->
+                                if not (String.Equals(key, sortKeyState.Current, StringComparison.OrdinalIgnoreCase)) then
+                                    sortKeyState.Set key
+
+                                if asc <> sortAscState.Current then
+                                    sortAscState.Set asc)
+                          SortKey = sortKeyState.Current
+                          SortAsc = sortAscState.Current }
 
                 let editBar = EditBar.view { OnBatchEdit = handleBatchEdit }
 
@@ -379,25 +390,6 @@ type MainWindow() as this =
                                                                                                                                                           |> List.length)
                                                                                                                                                  ) ]
                                                                                                                           Button.create [ Button.content
-                                                                                                                                              "Ping"
-                                                                                                                                          Button.onClick
-                                                                                                                                              (fun _ ->
-                                                                                                                                                  status
-                                                                                                                                                      .Set(
-                                                                                                                                                          Some
-                                                                                                                                                              "Ping OK"
-                                                                                                                                                      )) ]
-                                                                                                                          Button.create [ Button.content
-                                                                                                                                              "Show Bounds"
-                                                                                                                                          Button.onClick
-                                                                                                                                              (fun _ ->
-                                                                                                                                                  // Toggle a visual border via status text as trigger (cheap state)
-                                                                                                                                                  status
-                                                                                                                                                      .Set(
-                                                                                                                                                          Some
-                                                                                                                                                              "toggle-bounds"
-                                                                                                                                                      )) ]
-                                                                                                                          Button.create [ Button.content
                                                                                                                                               "Reset Columns"
                                                                                                                                           Button.onClick
                                                                                                                                               (fun _ ->
@@ -433,16 +425,10 @@ type MainWindow() as this =
                                                                                                                                                               (fun c ->
                                                                                                                                                                   c.Header)
                                                                                                                                                       )) ] ] ]
-                                                                                // Center host with explicit stretch and a thin border for debugging
                                                                                 Border.create [ Grid.row 1
                                                                                                 Border.borderThickness (
-                                                                                                    if status.Current = Some
-                                                                                                                            "toggle-bounds" then
-                                                                                                        Avalonia.Thickness
-                                                                                                            1.0
-                                                                                                    else
-                                                                                                        Avalonia.Thickness
-                                                                                                            0.0
+                                                                                                    Avalonia.Thickness
+                                                                                                        0.0
                                                                                                 )
                                                                                                 Border.borderBrush (
                                                                                                     Avalonia.Media.Brushes.Red

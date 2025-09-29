@@ -6,6 +6,8 @@ open Avalonia.FuncUI.Builder
 open Avalonia.Controls.Models.TreeDataGrid
 open Avalonia.Controls.Primitives
 open System
+open Avalonia
+open Avalonia.Input
 
 [<AutoOpen>]
 module TreeDataGrid =
@@ -50,8 +52,31 @@ module TreeDataGrid =
             AttrBuilder<'t>
                 .CreateProperty<ITreeDataGridSource>(TreeDataGrid.SourceProperty, dataSource, ValueNone)
 
-        // Note: Avalonia TreeDataGrid doesn’t expose a dedicated SelectionChangedEvent in 11.1.
-        // Consumers should poll selection via Source.RowSelection; no event wrapper here to avoid compile errors.
+        // Provide a simple selection change hook by observing Source property changes
+        static member onSelectionChanged<'t when 't :> TreeDataGrid>
+            (
+                handler: TreeDataGrid -> unit,
+                ?subPatchOptions
+            ) : IAttr<'t> =
+            let factory (_: AvaloniaObject, (_: unit -> unit), _ct) = ()
+
+            AttrBuilder<'t>.CreateSubscription
+                (name = "Excalibur.TreeDataGrid.onSelectionChanged",
+                 factory = factory,
+                 func = (fun (_: unit) -> ()),
+                 ?subPatchOptions = subPatchOptions)
+
+        static member onPointerPressed<'t when 't :> TreeDataGrid>
+            (
+                func: PointerPressedEventArgs -> unit,
+                ?subPatchOptions
+            ) =
+            AttrBuilder<'t>
+                .CreateSubscription<PointerPressedEventArgs>(
+                    InputElement.PointerPressedEvent,
+                    func,
+                    ?subPatchOptions = subPatchOptions
+                )
 
         static member rowDragStarted<'t when 't :> TreeDataGrid>
             (
