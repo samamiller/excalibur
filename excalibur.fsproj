@@ -9,7 +9,7 @@
   </Target>
   <Target Name="Fantomas" AfterTargets="BeforeBuild" Condition="'$(DesignTimeBuild)' != 'true'">
   <Exec
-    Command="dotnet fantomas $(MSBuildProjectDirectory) --check"
+    Command="dotnet fantomas $(MSBuildProjectDirectory)"
     ConsoleToMsBuild="true"
     IgnoreExitCode="false"
   />
