@@ -11,10 +11,7 @@ module EditMetadataDialog =
           Tags: string option }
 
     let private toOption (text: string) =
-        if String.IsNullOrWhiteSpace text then
-            None
-        else
-            Some text
+        if String.IsNullOrWhiteSpace text then None else Some text
 
     let show (owner: Window) =
         async {

@@ -103,12 +103,7 @@ let private tryTextProperty (value: obj) : string option =
         let prop =
             value
                 .GetType()
-                .GetProperty(
-                    "Text",
-                    BindingFlags.Instance
-                    ||| BindingFlags.Public
-                    ||| BindingFlags.FlattenHierarchy
-                )
+                .GetProperty("Text", BindingFlags.Instance ||| BindingFlags.Public ||| BindingFlags.FlattenHierarchy)
 
         match prop with
         | null -> None
@@ -239,22 +234,16 @@ let view (props: Props) : Types.IView =
             | "Missing" -> if b.Missing then "Yes" else ""
             | _ -> b.Title
 
-        let sorted =
-            arr
-            |> Array.sortWith (fun a b -> cmp.Compare(keyOf a, keyOf b))
+        let sorted = arr |> Array.sortWith (fun a b -> cmp.Compare(keyOf a, keyOf b))
 
-        if sortAsc then
-            sorted
-        else
-            sorted |> Array.rev
+        if sortAsc then sorted else sorted |> Array.rev
 
     let items = props.Books |> List.toArray |> sortItems
 
     let indexById =
         let dict = Dictionary<int, int>()
 
-        items
-        |> Array.iteri (fun idx book -> dict[book.Id] <- idx)
+        items |> Array.iteri (fun idx book -> dict[book.Id] <- idx)
 
         dict
 
@@ -275,7 +264,7 @@ let view (props: Props) : Types.IView =
 
     let titleColumn: IColumn<Book> =
         let mi =
-            typeof<ColumnHelpers>.GetMethod ("TitleOf", BindingFlags.Public ||| BindingFlags.Static)
+            typeof<ColumnHelpers>.GetMethod("TitleOf", BindingFlags.Public ||| BindingFlags.Static)
 
         let p = Expression.Parameter(typeof<Book>, "b")
         let body = Expression.Call(mi, p)
@@ -290,7 +279,7 @@ let view (props: Props) : Types.IView =
 
     let authorColumn: IColumn<Book> =
         let mi =
-            typeof<ColumnHelpers>.GetMethod ("AuthorOf", BindingFlags.Public ||| BindingFlags.Static)
+            typeof<ColumnHelpers>.GetMethod("AuthorOf", BindingFlags.Public ||| BindingFlags.Static)
 
         let p = Expression.Parameter(typeof<Book>, "b")
         let body = Expression.Call(mi, p)
@@ -310,7 +299,7 @@ let view (props: Props) : Types.IView =
 
     let tagsColumn: IColumn<Book> =
         let mi =
-            typeof<ColumnHelpers>.GetMethod ("TagsOf", BindingFlags.Public ||| BindingFlags.Static)
+            typeof<ColumnHelpers>.GetMethod("TagsOf", BindingFlags.Public ||| BindingFlags.Static)
 
         let p = Expression.Parameter(typeof<Book>, "b")
         let body = Expression.Call(mi, p)
@@ -330,7 +319,7 @@ let view (props: Props) : Types.IView =
 
     let addedColumn: IColumn<Book> =
         let mi =
-            typeof<ColumnHelpers>.GetMethod ("AddedOf", BindingFlags.Public ||| BindingFlags.Static)
+            typeof<ColumnHelpers>.GetMethod("AddedOf", BindingFlags.Public ||| BindingFlags.Static)
 
         let p = Expression.Parameter(typeof<Book>, "b")
         let body = Expression.Call(mi, p)
@@ -350,7 +339,7 @@ let view (props: Props) : Types.IView =
 
     let missingColumn: IColumn<Book> =
         let mi =
-            typeof<ColumnHelpers>.GetMethod ("MissingOf", BindingFlags.Public ||| BindingFlags.Static)
+            typeof<ColumnHelpers>.GetMethod("MissingOf", BindingFlags.Public ||| BindingFlags.Static)
 
         let p = Expression.Parameter(typeof<Book>, "b")
         let body = Expression.Call(mi, p)
@@ -392,7 +381,7 @@ let view (props: Props) : Types.IView =
             item.Header <- cfg.Header
             item.IsChecked <- isOn
 
-            item.Click.Add (fun _ ->
+            item.Click.Add(fun _ ->
                 let next =
                     if isOn then
                         cols |> List.filter (fun c -> c.Id <> cfg.Id)
@@ -421,10 +410,7 @@ let view (props: Props) : Types.IView =
             let selected = s.RowSelection.SelectedItems
             Logger.infof "TDG selection changed: count=%d" (selected |> Seq.length)
 
-            selected
-            |> Seq.map (fun b -> b.Id)
-            |> Seq.toList
-            |> props.OnSelectionChanged
+            selected |> Seq.map (fun b -> b.Id) |> Seq.toList |> props.OnSelectionChanged
         | _ -> ()
 
     // Subscribe to selection changes from the RowSelection model
@@ -534,9 +520,7 @@ let view (props: Props) : Types.IView =
 
                     let resolvedKeyFromIndex =
                         if header.ColumnIndex >= 0 then
-                            cols
-                            |> List.tryItem header.ColumnIndex
-                            |> Option.map (fun c -> c.Header)
+                            cols |> List.tryItem header.ColumnIndex |> Option.map (fun c -> c.Header)
                         else
                             None
 
@@ -605,15 +589,16 @@ let view (props: Props) : Types.IView =
             | _ -> ()
         | _ -> ()
 
-    TreeDataGrid.create [ TreeDataGrid.Source source
-                          TreeDataGrid.ShowColumnHeaders true
-                          TreeDataGrid.CanUserSortColumns true
-                          // Hook selection refresh on attach/source change
-                          TreeDataGrid.OnSelectionChanged subscribeSelection
-                          // Row-level pointer to force selection at least once
-                          TreeDataGrid.OnPointerPressed onRowPointer
-                          // Attach context menu for column chooser
-                          Control.contextMenu columnMenu ]
+    TreeDataGrid.create
+        [ TreeDataGrid.Source source
+          TreeDataGrid.ShowColumnHeaders true
+          TreeDataGrid.CanUserSortColumns true
+          // Hook selection refresh on attach/source change
+          TreeDataGrid.OnSelectionChanged subscribeSelection
+          // Row-level pointer to force selection at least once
+          TreeDataGrid.OnPointerPressed onRowPointer
+          // Attach context menu for column chooser
+          Control.contextMenu columnMenu ]
 
 // Minimal sort support: handle AutoGeneratingColumn not available; rely on DataGrid's own sort toggling.
 // For now, we expose a helper to attach a handler externally if needed.

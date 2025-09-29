@@ -34,8 +34,8 @@ module ConfigService =
                 | _ -> cfg
             else
                 { Theme = None; Columns = None }
-        with
-        | _ -> { Theme = None; Columns = None }
+        with _ ->
+            { Theme = None; Columns = None }
 
     let save (cfg: AppConfig) =
         try
@@ -48,8 +48,8 @@ module ConfigService =
                 JsonSerializer.Serialize(cfg, JsonSerializerOptions(WriteIndented = true))
 
             File.WriteAllText(configPath (), json)
-        with
-        | _ -> ()
+        with _ ->
+            ()
 
     let setTheme (theme: string option) =
         let current = load ()

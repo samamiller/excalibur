@@ -12,32 +12,34 @@ type Props =
       OnSelectionChanged: int list -> unit }
 
 let private renderBook (book: Book) : Types.IView =
-    StackPanel.create [ StackPanel.orientation Orientation.Vertical
-                        StackPanel.children [ TextBlock.create [ TextBlock.text book.Title ]
-                                              TextBlock.create [ TextBlock.text (
-                                                                     defaultArg book.Author "Unknown author"
-                                                                 )
-                                                                 TextBlock.classes [ "subtle" ] ]
-                                              TextBlock.create [ TextBlock.text book.Path
-                                                                 TextBlock.fontSize 10.0 ]
-                                              (if book.Missing then
-                                                   TextBlock.create [ TextBlock.text "Missing file"
-                                                                      TextBlock.classes [ "subtle" ]
-                                                                      TextBlock.foreground Brushes.Orange ]
-                                                   :> Types.IView
-                                               else
-                                                   TextBlock.create [ TextBlock.text "" ] :> Types.IView) ] ]
+    StackPanel.create
+        [ StackPanel.orientation Orientation.Vertical
+          StackPanel.children
+              [ TextBlock.create [ TextBlock.text book.Title ]
+                TextBlock.create
+                    [ TextBlock.text (defaultArg book.Author "Unknown author")
+                      TextBlock.classes [ "subtle" ] ]
+                TextBlock.create [ TextBlock.text book.Path; TextBlock.fontSize 10.0 ]
+                (if book.Missing then
+                     TextBlock.create
+                         [ TextBlock.text "Missing file"
+                           TextBlock.classes [ "subtle" ]
+                           TextBlock.foreground Brushes.Orange ]
+                     :> Types.IView
+                 else
+                     TextBlock.create [ TextBlock.text "" ] :> Types.IView) ] ]
 
 let view props : Types.IView =
-    ListBox.create [ ListBox.selectionMode SelectionMode.Multiple
-                     ListBox.dataItems props.Books
-                     ListBox.onSelectionChanged (fun args ->
-                         match args.Source with
-                         | :? ListBox as lb ->
-                             lb.SelectedItems
-                             |> Seq.cast<Book>
-                             |> Seq.map (fun b -> b.Id)
-                             |> Seq.toList
-                             |> props.OnSelectionChanged
-                         | _ -> ())
-                     ListBox.itemTemplate (DataTemplateView<Book>.create renderBook) ]
+    ListBox.create
+        [ ListBox.selectionMode SelectionMode.Multiple
+          ListBox.dataItems props.Books
+          ListBox.onSelectionChanged (fun args ->
+              match args.Source with
+              | :? ListBox as lb ->
+                  lb.SelectedItems
+                  |> Seq.cast<Book>
+                  |> Seq.map (fun b -> b.Id)
+                  |> Seq.toList
+                  |> props.OnSelectionChanged
+              | _ -> ())
+          ListBox.itemTemplate (DataTemplateView<Book>.create renderBook) ]

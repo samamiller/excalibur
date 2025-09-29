@@ -12,12 +12,7 @@ module LibraryRepository =
     let ensureDb () =
         let dir = Path.GetDirectoryName dbPath
 
-        Directory.CreateDirectory(
-            if String.IsNullOrEmpty dir then
-                "."
-            else
-                dir
-        )
+        Directory.CreateDirectory(if String.IsNullOrEmpty dir then "." else dir)
         |> ignore
 
         use conn = new SqliteConnection(connectionString)
@@ -77,46 +72,23 @@ module LibraryRepository =
                 let id = r.GetInt32(0)
                 let title = r.GetString(1)
 
-                let author =
-                    if r.IsDBNull(2) then
-                        None
-                    else
-                        Some(r.GetString(2))
+                let author = if r.IsDBNull(2) then None else Some(r.GetString(2))
 
                 let path = r.GetString(3)
 
-                let tags =
-                    if r.IsDBNull(4) then
-                        None
-                    else
-                        Some(r.GetString(4))
+                let tags = if r.IsDBNull(4) then None else Some(r.GetString(4))
 
-                let comments =
-                    if r.IsDBNull(5) then
-                        None
-                    else
-                        Some(r.GetString(5))
+                let comments = if r.IsDBNull(5) then None else Some(r.GetString(5))
 
-                let checksum =
-                    if r.IsDBNull(6) then
-                        None
-                    else
-                        Some(r.GetString(6))
+                let checksum = if r.IsDBNull(6) then None else Some(r.GetString(6))
 
-                let addedAt =
-                    if r.IsDBNull(7) then
-                        None
-                    else
-                        Some(r.GetString(7))
+                let addedAt = if r.IsDBNull(7) then None else Some(r.GetString(7))
 
                 let missing =
                     try
-                        if r.IsDBNull(8) then
-                            false
-                        else
-                            (r.GetInt32(8) <> 0)
-                    with
-                    | _ -> false
+                        if r.IsDBNull(8) then false else (r.GetInt32(8) <> 0)
+                    with _ ->
+                        false
 
                 yield
                     { Id = id
@@ -149,8 +121,7 @@ module LibraryRepository =
         use existsCmd = conn.CreateCommand()
         existsCmd.CommandText <- "select 1 from books where path = $p limit 1"
 
-        existsCmd.Parameters.AddWithValue("$p", path)
-        |> ignore
+        existsCmd.Parameters.AddWithValue("$p", path) |> ignore
 
         let exists =
             match existsCmd.ExecuteScalar() with
@@ -177,8 +148,7 @@ module LibraryRepository =
 
             cmd.Parameters.AddWithValue("$p", path) |> ignore
 
-            cmd.Parameters.AddWithValue("$d", DateTime.UtcNow.ToString("o"))
-            |> ignore
+            cmd.Parameters.AddWithValue("$d", DateTime.UtcNow.ToString("o")) |> ignore
 
             let checksum =
                 try
@@ -188,17 +158,13 @@ module LibraryRepository =
                     sha.ComputeHash(fs)
                     |> BitConverter.ToString
                     |> fun hash -> hash.Replace("-", "").ToLowerInvariant()
-                with
-                | _ -> null
+                with _ ->
+                    null
 
             let cParam = cmd.CreateParameter()
             cParam.ParameterName <- "$c"
 
-            cParam.Value <-
-                if isNull checksum then
-                    box DBNull.Value
-                else
-                    box checksum
+            cParam.Value <- if isNull checksum then box DBNull.Value else box checksum
 
             cmd.Parameters.Add(cParam) |> ignore
 
@@ -211,8 +177,7 @@ module LibraryRepository =
         use cmd = conn.CreateCommand()
         cmd.CommandText <- "update books set missing = $m where id = $id"
 
-        cmd.Parameters.AddWithValue("$m", (if missing then 1 else 0))
-        |> ignore
+        cmd.Parameters.AddWithValue("$m", (if missing then 1 else 0)) |> ignore
 
         cmd.Parameters.AddWithValue("$id", id) |> ignore
         cmd.ExecuteNonQuery() |> ignore

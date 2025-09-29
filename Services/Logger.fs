@@ -28,8 +28,8 @@ module Logger =
                 Directory.CreateDirectory dir |> ignore
 
             File.AppendAllText(logPath (), line + Environment.NewLine)
-        with
-        | _ -> ()
+        with _ ->
+            ()
 
     let info (msg: string) = write "INFO" msg
     let warn (msg: string) = write "WARN" msg
