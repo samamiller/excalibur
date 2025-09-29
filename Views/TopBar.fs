@@ -20,7 +20,7 @@ let view props : Types.IView =
     let searchControls: Types.IView list =
         [ TextBox.create [ TextBox.watermark "Search title/author"
                            TextBox.text props.Query
-                           TextBox.onTextChanged (fun txt -> props.OnQueryChanged txt)
+                           TextBox.onTextChanged props.OnQueryChanged
                            TextBox.width 260.0 ]
           Button.create [ Button.content "Clear"
                           Button.onClick (fun _ -> props.OnClear()) ] ]

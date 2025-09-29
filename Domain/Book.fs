@@ -1,12 +1,12 @@
 namespace Excalibur.Domain
 
 type Book =
-    { id: int
-      title: string
-      author: string option
-      path: string
-      tags: string option
-      comments: string option
-      checksum: string option
-      added_at: string option
-      missing: bool }
+    { Id: int
+      Title: string
+      Author: string option
+      Path: string
+      Tags: string option
+      Comments: string option
+      Checksum: string option
+      AddedAt: string option
+      Missing: bool }

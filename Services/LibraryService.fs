@@ -16,10 +16,10 @@ module LibraryService =
     let syncMissingFlags () =
         loadBooks ()
         |> List.iter (fun book ->
-            let exists = File.Exists book.path
+            let exists = File.Exists book.Path
 
-            if exists = book.missing then
-                LibraryRepository.setMissing book.id (not exists))
+            if exists = book.Missing then
+                LibraryRepository.setMissing book.Id (not exists))
 
     let updateAuthorTags (ids: int list) (author: string option) (tags: string option) =
         if ids.Length > 0 then

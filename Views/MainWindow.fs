@@ -55,17 +55,17 @@ type MainWindow() as this =
 
                     if String.IsNullOrWhiteSpace query.Current then
                         books
-                        |> List.sortBy (fun b -> b.title.ToLowerInvariant())
+                        |> List.sortBy (fun b -> b.Title.ToLowerInvariant())
                     else
                         let q = query.Current.Trim().ToLowerInvariant()
 
                         books
                         |> List.filter (fun b ->
-                            b.title.ToLowerInvariant().Contains q
-                            || (b.author
+                            b.Title.ToLowerInvariant().Contains q
+                            || (b.Author
                                 |> Option.defaultValue ""
-                                |> fun a -> a.ToLowerInvariant().Contains q))
-                        |> List.sortBy (fun b -> b.title.ToLowerInvariant())
+                                |> (fun a -> a.ToLowerInvariant().Contains q)))
+                        |> List.sortBy (fun b -> b.Title.ToLowerInvariant())
 
                 let refreshBooks () =
                     let loaded = loadBooks ()
@@ -272,7 +272,7 @@ type MainWindow() as this =
                         (match selectedIds.Current with
                          | id :: _ ->
                              booksState.Current
-                             |> List.tryFind (fun b -> b.id = id)
+                             |> List.tryFind (fun b -> b.Id = id)
                          | [] -> None)
 
                 // Initialize columns from config or default

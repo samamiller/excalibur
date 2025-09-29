@@ -58,7 +58,7 @@ let private pointerTraceEnabled () =
 let private describeData (data: obj) : string option =
     match data with
     | null -> None
-    | :? Book as b -> Some(sprintf "Book(%d) \"%s\"" b.id b.title)
+    | :? Book as b -> Some(sprintf "Book(%d) \"%s\"" b.Id b.Title)
     | other -> Some(other.GetType().Name)
 
 let private describeControl (ctrl: Control) : string =
@@ -90,16 +90,11 @@ let private controlChain (ctrl: Control) (maxDepth: int) : Control list =
 
     collect ctrl 0 []
 
-let rec private findHeader (ctrl: Control) depth : TreeDataGridColumnHeader option =
-    if isNull (box ctrl) || depth > 10 then
-        None
-    else
-        match ctrl with
+let private findHeader (ctrl: Control) : TreeDataGridColumnHeader option =
+    controlChain ctrl 10
+    |> List.tryPick (function
         | :? TreeDataGridColumnHeader as header -> Some header
-        | _ ->
-            match ctrl.Parent with
-            | :? Control as parent -> findHeader parent (depth + 1)
-            | _ -> None
+        | _ -> None)
 
 let private tryTextProperty (value: obj) : string option =
     if isNull value then
@@ -122,17 +117,20 @@ let private tryTextProperty (value: obj) : string option =
             | :? string as s when not (String.IsNullOrWhiteSpace s) -> Some s
             | _ -> None
 
-let rec private extractHeaderText (value: obj) : string option =
-    match value with
-    | null -> None
-    | :? string as s when not (String.IsNullOrWhiteSpace s) -> Some s
-    | :? TextBlock as tb when not (String.IsNullOrWhiteSpace tb.Text) -> Some tb.Text
-    | :? HeaderedContentControl as hc ->
-        match extractHeaderText hc.Header with
-        | Some text -> Some text
-        | None -> extractHeaderText hc.Content
-    | :? ContentControl as cc -> extractHeaderText cc.Content
-    | other -> tryTextProperty other
+let private extractHeaderText (value: obj) : string option =
+    let rec loop (state: obj) : string option =
+        match state with
+        | null -> None
+        | :? string as s when not (String.IsNullOrWhiteSpace s) -> Some s
+        | :? TextBlock as tb when not (String.IsNullOrWhiteSpace tb.Text) -> Some tb.Text
+        | :? HeaderedContentControl as hc ->
+            match loop hc.Header with
+            | Some text -> Some text
+            | None -> loop hc.Content
+        | :? ContentControl as cc -> loop cc.Content
+        | other -> tryTextProperty other
+
+    loop value
 
 let private headerText (header: TreeDataGridColumnHeader) : string option =
     match extractHeaderText header.Content with
@@ -194,56 +192,27 @@ let private cell (text: string) =
     TextBlock.create [ TextBlock.text text ] :> Types.IView
 
 [<CompiledName("TitleText")>]
-let private titleText (book: Book) = book.title
+let private titleText (book: Book) = book.Title
 
 [<CompiledName("AuthorText")>]
-let private authorText (book: Book) = defaultArg book.author ""
+let private authorText (book: Book) = defaultArg book.Author ""
 
 [<CompiledName("TagsText")>]
-let private tagsText (book: Book) = defaultArg book.tags ""
+let private tagsText (book: Book) = defaultArg book.Tags ""
 
 [<CompiledName("AddedAtText")>]
-let private addedAtText (book: Book) = defaultArg book.added_at ""
+let private addedAtText (book: Book) = defaultArg book.AddedAt ""
 
 [<CompiledName("MissingText")>]
-let private missingText (book: Book) = if book.missing then "Yes" else ""
+let private missingText (book: Book) = if book.Missing then "Yes" else ""
 
 // Static helpers for expression-based TextColumns (use a real class for stable MethodInfo)
 type ColumnHelpers =
-    static member TitleOf(b: Book) = b.title
-    static member AuthorOf(b: Book) = defaultArg b.author ""
-    static member TagsOf(b: Book) = defaultArg b.tags ""
-    static member AddedOf(b: Book) = defaultArg b.added_at ""
-    static member MissingOf(b: Book) = if b.missing then "Yes" else ""
-
-let private colTemplate (cfg: ColumnConfig) : Types.IView =
-    match cfg.Id with
-    | Title ->
-        DataGridTemplateColumn.create [ DataGridTemplateColumn.header cfg.Header
-                                        DataGridTemplateColumn.cellTemplate (
-                                            DataTemplateView<Book>.create (fun b -> cell b.title)
-                                        ) ]
-    | Author ->
-        DataGridTemplateColumn.create [ DataGridTemplateColumn.header cfg.Header
-                                        DataGridTemplateColumn.cellTemplate (
-                                            DataTemplateView<Book>.create (fun b -> cell (defaultArg b.author ""))
-                                        ) ]
-    | ColTags ->
-        DataGridTemplateColumn.create [ DataGridTemplateColumn.header cfg.Header
-                                        DataGridTemplateColumn.cellTemplate (
-                                            DataTemplateView<Book>.create (fun b -> cell (defaultArg b.tags ""))
-                                        ) ]
-    | Added ->
-        DataGridTemplateColumn.create [ DataGridTemplateColumn.header cfg.Header
-                                        DataGridTemplateColumn.cellTemplate (
-                                            DataTemplateView<Book>.create (fun b -> cell (defaultArg b.added_at ""))
-                                        ) ]
-    | Missing ->
-        DataGridTemplateColumn.create [ DataGridTemplateColumn.header cfg.Header
-                                        DataGridTemplateColumn.cellTemplate (
-                                            DataTemplateView<Book>.create
-                                                (fun b -> cell (if b.missing then "Yes" else ""))
-                                        ) ]
+    static member TitleOf(b: Book) = b.Title
+    static member AuthorOf(b: Book) = defaultArg b.Author ""
+    static member TagsOf(b: Book) = defaultArg b.Tags ""
+    static member AddedOf(b: Book) = defaultArg b.AddedAt ""
+    static member MissingOf(b: Book) = if b.Missing then "Yes" else ""
 
 let view (props: Props) : Types.IView =
     let cols =
@@ -263,12 +232,12 @@ let view (props: Props) : Types.IView =
 
         let keyOf (b: Book) =
             match sortKey with
-            | "Title" -> b.title
-            | "Author" -> defaultArg b.author ""
-            | "Tags" -> defaultArg b.tags ""
-            | "Added" -> defaultArg b.added_at ""
-            | "Missing" -> if b.missing then "Yes" else ""
-            | _ -> b.title
+            | "Title" -> b.Title
+            | "Author" -> defaultArg b.Author ""
+            | "Tags" -> defaultArg b.Tags ""
+            | "Added" -> defaultArg b.AddedAt ""
+            | "Missing" -> if b.Missing then "Yes" else ""
+            | _ -> b.Title
 
         let sorted =
             arr
@@ -285,25 +254,9 @@ let view (props: Props) : Types.IView =
         let dict = Dictionary<int, int>()
 
         items
-        |> Array.iteri (fun idx book -> dict[book.id] <- idx)
+        |> Array.iteri (fun idx book -> dict[book.Id] <- idx)
 
         dict
-
-    let makeColumn header (valueExpr: ParameterExpression -> Expression) (valueFn: Book -> string) : IColumn<Book> =
-        let parameter = Expression.Parameter(typeof<Book>, "b")
-        let body = valueExpr parameter
-        let lambda = Expression.Lambda<Func<Book, string>>(body, parameter)
-        let options = TextColumnOptions<Book>()
-        options.CanUserSortColumn <- Nullable true
-        let comparer = StringComparer.OrdinalIgnoreCase
-        options.CompareAscending <- Comparison<Book>(fun a b -> comparer.Compare(valueFn a, valueFn b))
-        options.CompareDescending <- Comparison<Book>(fun a b -> comparer.Compare(valueFn b, valueFn a))
-        TextColumn<Book, string>(header, lambda, Nullable<GridLength>(), options) :> IColumn<Book>
-
-    let moduleType = typeof<ColumnId>.DeclaringType
-
-    let method name =
-        moduleType.GetMethod(name, BindingFlags.Static ||| BindingFlags.NonPublic)
 
     // Text columns using LINQ expressions for rendering; styles are provided by merged TreeDataGrid theme
     let setSortDirection (header: string) (col: TextColumn<Book, string>) =
@@ -330,8 +283,8 @@ let view (props: Props) : Types.IView =
         let opts = TextColumnOptions<Book>()
         opts.CanUserSortColumn <- Nullable true
         let cmp = StringComparer.OrdinalIgnoreCase
-        opts.CompareAscending <- Comparison<Book>(fun a b -> cmp.Compare(a.title, b.title))
-        opts.CompareDescending <- Comparison<Book>(fun a b -> cmp.Compare(b.title, a.title))
+        opts.CompareAscending <- Comparison<Book>(fun a b -> cmp.Compare(a.Title, b.Title))
+        opts.CompareDescending <- Comparison<Book>(fun a b -> cmp.Compare(b.Title, a.Title))
         let col = TextColumn<Book, string>("Title", lambda, Nullable(), opts)
         setSortDirection "Title" col :> IColumn<Book>
 
@@ -347,10 +300,10 @@ let view (props: Props) : Types.IView =
         let cmp = StringComparer.OrdinalIgnoreCase
 
         opts.CompareAscending <-
-            Comparison<Book>(fun a b -> cmp.Compare((defaultArg a.author ""), (defaultArg b.author "")))
+            Comparison<Book>(fun a b -> cmp.Compare((defaultArg a.Author ""), (defaultArg b.Author "")))
 
         opts.CompareDescending <-
-            Comparison<Book>(fun a b -> cmp.Compare((defaultArg b.author ""), (defaultArg a.author "")))
+            Comparison<Book>(fun a b -> cmp.Compare((defaultArg b.Author ""), (defaultArg a.Author "")))
 
         let col = TextColumn<Book, string>("Author", lambda, Nullable(), opts)
         setSortDirection "Author" col :> IColumn<Book>
@@ -367,10 +320,10 @@ let view (props: Props) : Types.IView =
         let cmp = StringComparer.OrdinalIgnoreCase
 
         opts.CompareAscending <-
-            Comparison<Book>(fun a b -> cmp.Compare((defaultArg a.tags ""), (defaultArg b.tags "")))
+            Comparison<Book>(fun a b -> cmp.Compare((defaultArg a.Tags ""), (defaultArg b.Tags "")))
 
         opts.CompareDescending <-
-            Comparison<Book>(fun a b -> cmp.Compare((defaultArg b.tags ""), (defaultArg a.tags "")))
+            Comparison<Book>(fun a b -> cmp.Compare((defaultArg b.Tags ""), (defaultArg a.Tags "")))
 
         let col = TextColumn<Book, string>("Tags", lambda, Nullable(), opts)
         setSortDirection "Tags" col :> IColumn<Book>
@@ -387,10 +340,10 @@ let view (props: Props) : Types.IView =
         let cmp = StringComparer.OrdinalIgnoreCase
 
         opts.CompareAscending <-
-            Comparison<Book>(fun a b -> cmp.Compare((defaultArg a.added_at ""), (defaultArg b.added_at "")))
+            Comparison<Book>(fun a b -> cmp.Compare((defaultArg a.AddedAt ""), (defaultArg b.AddedAt "")))
 
         opts.CompareDescending <-
-            Comparison<Book>(fun a b -> cmp.Compare((defaultArg b.added_at ""), (defaultArg a.added_at "")))
+            Comparison<Book>(fun a b -> cmp.Compare((defaultArg b.AddedAt ""), (defaultArg a.AddedAt "")))
 
         let col = TextColumn<Book, string>("Added", lambda, Nullable(), opts)
         setSortDirection "Added" col :> IColumn<Book>
@@ -405,7 +358,7 @@ let view (props: Props) : Types.IView =
         let opts = TextColumnOptions<Book>()
         opts.CanUserSortColumn <- Nullable true
         let cmp = StringComparer.OrdinalIgnoreCase
-        let miss (b: Book) = if b.missing then "Yes" else ""
+        let miss (b: Book) = if b.Missing then "Yes" else ""
         opts.CompareAscending <- Comparison<Book>(fun a b -> cmp.Compare(miss a, miss b))
         opts.CompareDescending <- Comparison<Book>(fun a b -> cmp.Compare(miss b, miss a))
         let col = TextColumn<Book, string>("Missing", lambda, Nullable(), opts)
@@ -435,7 +388,7 @@ let view (props: Props) : Types.IView =
     let columnMenu: ContextMenu =
         let mk (cfg: ColumnConfig) =
             let isOn = cols |> List.exists (fun c -> c.Id = cfg.Id)
-            let item = new MenuItem()
+            let item = MenuItem()
             item.Header <- cfg.Header
             item.IsChecked <- isOn
 
@@ -450,7 +403,7 @@ let view (props: Props) : Types.IView =
 
             item :> obj
 
-        let cm = new ContextMenu()
+        let cm = ContextMenu()
 
         cm.ItemsSource <-
             [ mk { Id = Title; Header = "Title" }
@@ -469,7 +422,7 @@ let view (props: Props) : Types.IView =
             Logger.infof "TDG selection changed: count=%d" (selected |> Seq.length)
 
             selected
-            |> Seq.map (fun b -> b.id)
+            |> Seq.map (fun b -> b.Id)
             |> Seq.toList
             |> props.OnSelectionChanged
         | _ -> ()
@@ -524,8 +477,8 @@ let view (props: Props) : Types.IView =
 
                 match localHit with
                 | :? TreeDataGridColumnHeader as header -> Some header
-                | :? Control as ctrl -> findHeader ctrl 0
-                | _ -> findHeader c 0
+                | :? Control as ctrl -> findHeader ctrl
+                | _ -> findHeader c
 
             let headerCandidateViaVisual (tdg: TreeDataGrid) =
                 let pointOnGrid = e.GetPosition(tdg)
@@ -533,7 +486,7 @@ let view (props: Props) : Types.IView =
                 VisualExtensions.GetVisualsAt(tdg, pointOnGrid)
                 |> Seq.tryPick (function
                     | :? TreeDataGridColumnHeader as header -> Some header
-                    | :? Control as ctrl -> findHeader ctrl 0
+                    | :? Control as ctrl -> findHeader ctrl
                     | _ -> None)
 
             let headerCandidate =
@@ -635,10 +588,10 @@ let view (props: Props) : Types.IView =
                 | Some book, Some tdg ->
                     match tdg.Source with
                     | :? Avalonia.Controls.FlatTreeDataGridSource<Book> as s when not (isNull s.RowSelection) ->
-                        match indexById.TryGetValue book.id with
+                        match indexById.TryGetValue book.Id with
                         | true, idx ->
                             s.RowSelection.Select(idx)
-                            Logger.infof "TDG manual select: id=%d idx=%d" book.id idx
+                            Logger.infof "TDG manual select: id=%d idx=%d" book.Id idx
                             onSelectionChanged tdg
                         | _ ->
                             if s.Rows.Count > 0 then
@@ -652,13 +605,13 @@ let view (props: Props) : Types.IView =
             | _ -> ()
         | _ -> ()
 
-    TreeDataGrid.create [ TreeDataGrid.source source
-                          TreeDataGrid.showColumnHeaders true
-                          TreeDataGrid.canUserSortColumns true
+    TreeDataGrid.create [ TreeDataGrid.Source source
+                          TreeDataGrid.ShowColumnHeaders true
+                          TreeDataGrid.CanUserSortColumns true
                           // Hook selection refresh on attach/source change
-                          TreeDataGrid.onSelectionChanged (fun ctl -> subscribeSelection ctl)
+                          TreeDataGrid.OnSelectionChanged subscribeSelection
                           // Row-level pointer to force selection at least once
-                          TreeDataGrid.onPointerPressed (fun e -> onRowPointer e)
+                          TreeDataGrid.OnPointerPressed onRowPointer
                           // Attach context menu for column chooser
                           Control.contextMenu columnMenu ]
 

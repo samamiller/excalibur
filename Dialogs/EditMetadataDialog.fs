@@ -18,19 +18,19 @@ module EditMetadataDialog =
 
     let show (owner: Window) =
         async {
-            let dialog = new Window(Width = 400.0, Height = 220.0, Title = "Batch Edit")
+            let dialog = Window(Width = 400.0, Height = 220.0, Title = "Batch Edit")
 
-            let tbAuthor = new TextBox(Watermark = "Author")
+            let tbAuthor = TextBox(Watermark = "Author")
 
-            let tbTags = new TextBox(Watermark = "Tags (comma separated)")
+            let tbTags = TextBox(Watermark = "Tags (comma separated)")
 
-            let btnSave = new Button(Content = "Save")
+            let btnSave = Button(Content = "Save")
 
             btnSave.Click.Add(fun _ -> dialog.Close(box true))
 
-            let panel = new StackPanel(Spacing = 8.0, Margin = Thickness 12.0)
+            let panel = StackPanel(Spacing = 8.0, Margin = Thickness 12.0)
 
-            panel.Children.Add(new TextBlock(Text = "Set Author and/or Tags for selection"))
+            panel.Children.Add(TextBlock(Text = "Set Author and/or Tags for selection"))
 
             panel.Children.Add(tbAuthor)
             panel.Children.Add(tbTags)

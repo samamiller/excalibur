@@ -12,7 +12,7 @@ type Props =
 let private groupTags (books: Book list) =
     books
     |> List.collect (fun b ->
-        match b.tags with
+        match b.Tags with
         | Some t when t.Trim() <> "" ->
             t.Split([| ',' |])
             |> Array.toList

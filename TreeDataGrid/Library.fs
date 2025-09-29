@@ -16,98 +16,102 @@ module TreeDataGrid =
 
     type TreeDataGrid with
 
-        static member autoDragDropRows<'t when 't :> TreeDataGrid>(autoDragDropRows: bool) : IAttr<'t> =
-            AttrBuilder<'t>
+        static member AutoDragDropRows<'TTree when 'TTree :> TreeDataGrid>(autoDragDropRows: bool) : IAttr<'TTree> =
+            AttrBuilder<'TTree>
                 .CreateProperty<bool>(TreeDataGrid.AutoDragDropRowsProperty, autoDragDropRows, ValueNone)
 
-        static member canUserResizeColumns<'t when 't :> TreeDataGrid>(canUserResizeColumns: bool) : IAttr<'t> =
-            AttrBuilder<'t>
+        static member CanUserResizeColumns<'TTree when 'TTree :> TreeDataGrid>
+            (canUserResizeColumns: bool)
+            : IAttr<'TTree> =
+            AttrBuilder<'TTree>
                 .CreateProperty<bool>(TreeDataGrid.CanUserResizeColumnsProperty, canUserResizeColumns, ValueNone)
 
-        static member canUserSortColumns<'t when 't :> TreeDataGrid>(canUserSortColumns: bool) : IAttr<'t> =
-            AttrBuilder<'t>
+        static member CanUserSortColumns<'TTree when 'TTree :> TreeDataGrid>(canUserSortColumns: bool) : IAttr<'TTree> =
+            AttrBuilder<'TTree>
                 .CreateProperty<bool>(TreeDataGrid.CanUserSortColumnsProperty, canUserSortColumns, ValueNone)
 
-        static member columns<'t when 't :> TreeDataGrid>(columns: IColumns) : IAttr<'t> =
-            AttrBuilder<'t>
+        static member Columns<'TTree when 'TTree :> TreeDataGrid>(columns: IColumns) : IAttr<'TTree> =
+            AttrBuilder<'TTree>
                 .CreateProperty<IColumns>(TreeDataGrid.ColumnsProperty, columns, ValueNone)
 
-        static member elementFactory<'t when 't :> TreeDataGrid>(factory: TreeDataGridElementFactory) : IAttr<'t> =
-            AttrBuilder<'t>
+        static member ElementFactory<'TTree when 'TTree :> TreeDataGrid>
+            (factory: TreeDataGridElementFactory)
+            : IAttr<'TTree> =
+            AttrBuilder<'TTree>
                 .CreateProperty<TreeDataGridElementFactory>(TreeDataGrid.ElementFactoryProperty, factory, ValueNone)
 
-        static member rows<'t when 't :> TreeDataGrid>(rows: IRows) : IAttr<'t> =
-            AttrBuilder<'t>
+        static member Rows<'TTree when 'TTree :> TreeDataGrid>(rows: IRows) : IAttr<'TTree> =
+            AttrBuilder<'TTree>
                 .CreateProperty<IRows>(TreeDataGrid.RowsProperty, rows, ValueNone)
 
-        static member scroll<'t when 't :> TreeDataGrid>(scrollable: IScrollable) : IAttr<'t> =
-            AttrBuilder<'t>
+        static member Scroll<'TTree when 'TTree :> TreeDataGrid>(scrollable: IScrollable) : IAttr<'TTree> =
+            AttrBuilder<'TTree>
                 .CreateProperty<IScrollable>(TreeDataGrid.ScrollProperty, scrollable, ValueNone)
 
-        static member showColumnHeaders<'t when 't :> TreeDataGrid>(showHeaders: bool) : IAttr<'t> =
-            AttrBuilder<'t>
+        static member ShowColumnHeaders<'TTree when 'TTree :> TreeDataGrid>(showHeaders: bool) : IAttr<'TTree> =
+            AttrBuilder<'TTree>
                 .CreateProperty<bool>(TreeDataGrid.ShowColumnHeadersProperty, showHeaders, ValueNone)
 
-        static member source<'t when 't :> TreeDataGrid>(dataSource: ITreeDataGridSource) : IAttr<'t> =
-            AttrBuilder<'t>
+        static member Source<'TTree when 'TTree :> TreeDataGrid>(dataSource: ITreeDataGridSource) : IAttr<'TTree> =
+            AttrBuilder<'TTree>
                 .CreateProperty<ITreeDataGridSource>(TreeDataGrid.SourceProperty, dataSource, ValueNone)
 
         // Provide a simple selection change hook by observing Source property changes
-        static member onSelectionChanged<'t when 't :> TreeDataGrid>
+        static member OnSelectionChanged<'TTree when 'TTree :> TreeDataGrid>
             (
                 handler: TreeDataGrid -> unit,
                 ?subPatchOptions
-            ) : IAttr<'t> =
+            ) : IAttr<'TTree> =
             let factory (_: AvaloniaObject, (_: unit -> unit), _ct) = ()
 
-            AttrBuilder<'t>.CreateSubscription
+            AttrBuilder<'TTree>.CreateSubscription
                 (name = "Excalibur.TreeDataGrid.onSelectionChanged",
                  factory = factory,
                  func = (fun (_: unit) -> ()),
                  ?subPatchOptions = subPatchOptions)
 
-        static member onPointerPressed<'t when 't :> TreeDataGrid>
+        static member OnPointerPressed<'TTree when 'TTree :> TreeDataGrid>
             (
                 func: PointerPressedEventArgs -> unit,
                 ?subPatchOptions
             ) =
-            AttrBuilder<'t>
+            AttrBuilder<'TTree>
                 .CreateSubscription<PointerPressedEventArgs>(
                     InputElement.PointerPressedEvent,
                     func,
                     ?subPatchOptions = subPatchOptions
                 )
 
-        static member rowDragStarted<'t when 't :> TreeDataGrid>
+        static member RowDragStarted<'TTree when 'TTree :> TreeDataGrid>
             (
                 func: TreeDataGridRowDragStartedEventArgs -> unit,
                 ?subPatchOptions
             ) =
-            AttrBuilder<'t>
+            AttrBuilder<'TTree>
                 .CreateSubscription<TreeDataGridRowDragStartedEventArgs>(
                     TreeDataGrid.RowDragStartedEvent,
                     func,
                     ?subPatchOptions = subPatchOptions
                 )
 
-        static member rowDragOver<'t when 't :> TreeDataGrid>
+        static member RowDragOver<'TTree when 'TTree :> TreeDataGrid>
             (
                 func: TreeDataGridRowDragEventArgs -> unit,
                 ?subPatchOptions
             ) =
-            AttrBuilder<'t>
+            AttrBuilder<'TTree>
                 .CreateSubscription<TreeDataGridRowDragEventArgs>(
                     TreeDataGrid.RowDragOverEvent,
                     func,
                     ?subPatchOptions = subPatchOptions
                 )
 
-        static member rowDrop<'t when 't :> TreeDataGrid>
+        static member RowDrop<'TTree when 'TTree :> TreeDataGrid>
             (
                 func: TreeDataGridRowDragEventArgs -> unit,
                 ?subPatchOptions
             ) =
-            AttrBuilder<'t>
+            AttrBuilder<'TTree>
                 .CreateSubscription<TreeDataGridRowDragEventArgs>(
                     TreeDataGrid.RowDropEvent,
                     func,

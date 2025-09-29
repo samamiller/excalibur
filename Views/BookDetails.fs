@@ -19,24 +19,24 @@ let private details (b: Book) : Types.IView =
     ScrollViewer.create [ ScrollViewer.content (
                               StackPanel.create [ StackPanel.spacing 6.0
                                                   StackPanel.margin 8.0
-                                                  StackPanel.children [ TextBlock.create [ TextBlock.text b.title
+                                                  StackPanel.children [ TextBlock.create [ TextBlock.text b.Title
                                                                                            TextBlock.fontSize 18.0 ]
                                                                         TextBlock.create [ TextBlock.text (
                                                                                                defaultArg
-                                                                                                   b.author
+                                                                                                   b.Author
                                                                                                    "Unknown author"
                                                                                            ) ]
                                                                         TextBlock.create [ TextBlock.text (
-                                                                                               sprintf "Path: %s" b.path
+                                                                                               sprintf "Path: %s" b.Path
                                                                                            ) ]
-                                                                        (match b.tags with
+                                                                        (match b.Tags with
                                                                          | Some t when t <> "" ->
                                                                              TextBlock.create [ TextBlock.text (
                                                                                                     sprintf "Tags: %s" t
                                                                                                 ) ]
                                                                          | _ ->
                                                                              TextBlock.create [ TextBlock.text "Tags: —" ])
-                                                                        (match b.comments with
+                                                                        (match b.Comments with
                                                                          | Some c when c <> "" ->
                                                                              TextBlock.create [ TextBlock.text c
                                                                                                 TextBlock.textWrapping

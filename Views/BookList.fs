@@ -13,14 +13,14 @@ type Props =
 
 let private renderBook (book: Book) : Types.IView =
     StackPanel.create [ StackPanel.orientation Orientation.Vertical
-                        StackPanel.children [ TextBlock.create [ TextBlock.text book.title ]
+                        StackPanel.children [ TextBlock.create [ TextBlock.text book.Title ]
                                               TextBlock.create [ TextBlock.text (
-                                                                     defaultArg book.author "Unknown author"
+                                                                     defaultArg book.Author "Unknown author"
                                                                  )
                                                                  TextBlock.classes [ "subtle" ] ]
-                                              TextBlock.create [ TextBlock.text book.path
+                                              TextBlock.create [ TextBlock.text book.Path
                                                                  TextBlock.fontSize 10.0 ]
-                                              (if book.missing then
+                                              (if book.Missing then
                                                    TextBlock.create [ TextBlock.text "Missing file"
                                                                       TextBlock.classes [ "subtle" ]
                                                                       TextBlock.foreground Brushes.Orange ]
@@ -36,7 +36,7 @@ let view props : Types.IView =
                          | :? ListBox as lb ->
                              lb.SelectedItems
                              |> Seq.cast<Book>
-                             |> Seq.map (fun b -> b.id)
+                             |> Seq.map (fun b -> b.Id)
                              |> Seq.toList
                              |> props.OnSelectionChanged
                          | _ -> ())

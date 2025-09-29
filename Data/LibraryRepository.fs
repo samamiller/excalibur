@@ -103,7 +103,7 @@ module LibraryRepository =
                     else
                         Some(r.GetString(6))
 
-                let added_at =
+                let addedAt =
                     if r.IsDBNull(7) then
                         None
                     else
@@ -119,15 +119,15 @@ module LibraryRepository =
                     | _ -> false
 
                 yield
-                    { id = id
-                      title = title
-                      author = author
-                      path = path
-                      tags = tags
-                      comments = comments
-                      checksum = checksum
-                      added_at = added_at
-                      missing = missing }
+                    { Id = id
+                      Title = title
+                      Author = author
+                      Path = path
+                      Tags = tags
+                      Comments = comments
+                      Checksum = checksum
+                      AddedAt = addedAt
+                      Missing = missing }
         }
         |> List.ofSeq
 
