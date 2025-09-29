@@ -17,17 +17,11 @@ module LibraryRepository =
 
         use conn = new SqliteConnection(connectionString)
         conn.Open()
+        // bootstrap minimal table to allow ALTERs to succeed in migrations
         use cmd = conn.CreateCommand()
 
         cmd.CommandText <-
-            """
-        CREATE TABLE IF NOT EXISTS books (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            author TEXT NULL,
-            path TEXT NOT NULL
-        );
-        """
+            "CREATE TABLE IF NOT EXISTS books (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, author TEXT NULL, path TEXT NOT NULL);"
 
         cmd.ExecuteNonQuery() |> ignore
 
@@ -53,18 +47,22 @@ module LibraryRepository =
         ensureColumn "books" "comments" "ALTER TABLE books ADD COLUMN comments TEXT NULL"
         ensureColumn "books" "tags" "ALTER TABLE books ADD COLUMN tags TEXT NULL"
         ensureColumn "books" "missing" "ALTER TABLE books ADD COLUMN missing INTEGER NOT NULL DEFAULT 0"
+        ensureColumn "books" "sortable_title" "ALTER TABLE books ADD COLUMN sortable_title TEXT NULL"
+        ensureColumn "books" "pubdate" "ALTER TABLE books ADD COLUMN pubdate TEXT NULL"
+        ensureColumn "books" "series_index" "ALTER TABLE books ADD COLUMN series_index REAL NULL"
+        ensureColumn "books" "author_sort" "ALTER TABLE books ADD COLUMN author_sort TEXT NULL"
+        ensureColumn "books" "isbn" "ALTER TABLE books ADD COLUMN isbn TEXT NULL"
+        ensureColumn "books" "series_id" "ALTER TABLE books ADD COLUMN series_id INTEGER NULL"
 
-        use ci = conn.CreateCommand()
+        // apply SQL migrations idempotently (tables, indexes)
+        let migrationsPath =
+            Path.Combine(Environment.CurrentDirectory, "Data", "Migrations.sql")
 
-        ci.CommandText <-
-            """
-        CREATE INDEX IF NOT EXISTS idx_books_title ON books(title);
-        CREATE INDEX IF NOT EXISTS idx_books_author ON books(author);
-        CREATE INDEX IF NOT EXISTS idx_books_tags ON books(tags);
-        CREATE UNIQUE INDEX IF NOT EXISTS ux_books_path ON books(path);
-        """
-
-        ci.ExecuteNonQuery() |> ignore
+        if File.Exists migrationsPath then
+            let sql = File.ReadAllText migrationsPath
+            use m = conn.CreateCommand()
+            m.CommandText <- sql
+            m.ExecuteNonQuery() |> ignore
 
     let private readBooks (r: SqliteDataReader) =
         seq {
@@ -103,6 +101,103 @@ module LibraryRepository =
         }
         |> List.ofSeq
 
+    type SortKey =
+        | Title
+        | Author
+        | SortableTitle
+        | AuthorSort
+        | AddedAt
+        | Missing
+
+    type SortSpec = { Key: SortKey; Asc: bool }
+
+    type Filters =
+        { TitleContains: string option
+          AuthorContains: string option
+          TagContains: string option
+          MissingOnly: bool option
+          AuthorEquals: string option
+          TagEquals: string option
+          SeriesEquals: string option }
+
+    type Page = { Offset: int; Limit: int }
+
+    let private orderBySql (sorts: SortSpec list) =
+        if List.isEmpty sorts then
+            "order by title"
+        else
+            sorts
+            |> List.map (fun s ->
+                let col =
+                    match s.Key with
+                    | Title -> "title"
+                    | Author -> "author"
+                    | SortableTitle -> "sortable_title"
+                    | AuthorSort -> "author_sort"
+                    | AddedAt -> "added_at"
+                    | Missing -> "missing"
+
+                let dir = if s.Asc then "asc" else "desc"
+                $"{col} {dir}")
+            |> String.concat ","
+            |> fun ob -> $"order by {ob}"
+
+    let private whereSql (filters: Filters) =
+        let clauses =
+            [ match filters.TitleContains with
+              | Some v when v <> "" -> yield "b.title like $ftitle"
+              | _ -> ()
+              match filters.AuthorContains with
+              | Some v when v <> "" -> yield "b.author like $fauthor"
+              | _ -> ()
+              match filters.TagContains with
+              | Some v when v <> "" -> yield "b.tags like $ftag"
+              | _ -> ()
+              match filters.AuthorEquals with
+              | Some _ -> yield "a.name = $aeq"
+              | None -> ()
+              match filters.TagEquals with
+              | Some _ -> yield "t.name = $teq"
+              | None -> ()
+              match filters.SeriesEquals with
+              | Some _ -> yield "s.name = $seq"
+              | None -> ()
+              match filters.MissingOnly with
+              | Some true -> yield "b.missing = 1"
+              | _ -> () ]
+
+        if List.isEmpty clauses then
+            ""
+        else
+            "where " + String.concat " and " clauses
+
+    let private bindFilterParams (cmd: SqliteCommand) (filters: Filters) =
+        match filters.TitleContains with
+        | Some v when v <> "" -> cmd.Parameters.AddWithValue("$ftitle", "%" + v + "%") |> ignore
+        | _ -> ()
+
+        match filters.AuthorContains with
+        | Some v when v <> "" -> cmd.Parameters.AddWithValue("$fauthor", "%" + v + "%") |> ignore
+        | _ -> ()
+
+        match filters.TagContains with
+        | Some v when v <> "" -> cmd.Parameters.AddWithValue("$ftag", "%" + v + "%") |> ignore
+        | _ -> ()
+
+        match filters.AuthorEquals with
+        | Some v -> cmd.Parameters.AddWithValue("$aeq", v) |> ignore
+        | None -> ()
+
+        match filters.TagEquals with
+        | Some v -> cmd.Parameters.AddWithValue("$teq", v) |> ignore
+        | None -> ()
+
+        match filters.SeriesEquals with
+        | Some v -> cmd.Parameters.AddWithValue("$seq", v) |> ignore
+        | None -> ()
+
+        ()
+
     let getBooks () =
         use conn = new SqliteConnection(connectionString)
         conn.Open()
@@ -113,6 +208,65 @@ module LibraryRepository =
 
         use r = cmd.ExecuteReader()
         readBooks r
+
+    let queryBooks (filters: Filters) (sorts: SortSpec list) (page: Page option) =
+        use conn = new SqliteConnection(connectionString)
+        conn.Open()
+        use cmd = conn.CreateCommand()
+        let whereClause = whereSql filters
+        let orderClause = orderBySql sorts
+
+        let limitClause =
+            match page with
+            | Some p -> $" limit {p.Limit} offset {p.Offset}"
+            | None -> ""
+
+        let joins =
+            [ match filters.AuthorEquals with
+              | Some _ ->
+                  yield "left join books_authors_link bal on bal.book_id=b.id left join authors a on a.id=bal.author_id"
+              | None -> ()
+              match filters.TagEquals with
+              | Some _ -> yield "left join books_tags_link btl on btl.book_id=b.id left join tags t on t.id=btl.tag_id"
+              | None -> ()
+              match filters.SeriesEquals with
+              | Some _ -> yield ""
+              | None -> () ]
+            |> String.concat " "
+
+        cmd.CommandText <-
+            $"select b.id,b.title,b.author,b.path,b.tags,b.comments,b.checksum,b.added_at,b.missing from books b {joins} {whereClause} {orderClause}{limitClause}"
+
+        bindFilterParams cmd filters
+        use r = cmd.ExecuteReader()
+        readBooks r
+
+    let countBooks (filters: Filters) =
+        use conn = new SqliteConnection(connectionString)
+        conn.Open()
+        use cmd = conn.CreateCommand()
+        let whereClause = whereSql filters
+
+        let joins =
+            [ match filters.AuthorEquals with
+              | Some _ ->
+                  yield "left join books_authors_link bal on bal.book_id=b.id left join authors a on a.id=bal.author_id"
+              | None -> ()
+              match filters.TagEquals with
+              | Some _ -> yield "left join books_tags_link btl on btl.book_id=b.id left join tags t on t.id=btl.tag_id"
+              | None -> ()
+              match filters.SeriesEquals with
+              | Some _ -> yield ""
+              | None -> () ]
+            |> String.concat " "
+
+        cmd.CommandText <- $"select count(distinct b.id) from books b {joins} {whereClause}"
+        bindFilterParams cmd filters
+
+        match cmd.ExecuteScalar() with
+        | :? int64 as c -> int c
+        | :? int as c -> c
+        | _ -> 0
 
     let addBook (title: string) (author: string option) (path: string) : bool =
         use conn = new SqliteConnection(connectionString)

@@ -37,6 +37,7 @@
     <Compile Include="TreeDataGrid/Library.fs" />
     <Compile Include="Domain/Book.fs" />
     <Compile Include="Data/LibraryRepository.fs" />
+    <Compile Include="Services/AuthorsTagsSeries.fs" />
     <Compile Include="Services/LibraryService.fs" />
     <Compile Include="Services/Logger.fs" />
     <Compile Include="Services/ConfigService.fs" />

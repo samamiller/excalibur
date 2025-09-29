@@ -9,6 +9,12 @@ module LibraryService =
 
     let loadBooks () = LibraryRepository.getBooks ()
 
+    // Query with filters/sorts/paging for TreeDataGrid
+    let queryBooks filters sorts page =
+        LibraryRepository.queryBooks filters sorts page
+
+    let countBooks filters = LibraryRepository.countBooks filters
+
     let addBookFromPath (path: string) (author: string option) : bool =
         let title = Path.GetFileNameWithoutExtension path
         LibraryRepository.addBook title author path

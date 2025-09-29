@@ -35,6 +35,12 @@ type MainWindow() as this =
             Component(fun ctx ->
                 let booksState = ctx.useState (loadBooks ())
                 let query = ctx.useState ""
+                let authorEq = ctx.useState (None: string option)
+                let tagEq = ctx.useState (None: string option)
+                let seriesEq = ctx.useState (None: string option)
+                let totalCount = ctx.useState (booksState.Current.Length)
+                let pageSize = 50
+                let pageIndex = ctx.useState 0
                 let selectedIds = ctx.useState ([]: int list)
                 let theme = ctx.useState "System"
                 let status = ctx.useState (None: string option)
@@ -50,19 +56,7 @@ type MainWindow() as this =
                     | "Dark" -> this.RequestedThemeVariant <- Avalonia.Styling.ThemeVariant.Dark
                     | _ -> this.RequestedThemeVariant <- Avalonia.Styling.ThemeVariant.Light
 
-                let filteredBooks =
-                    let books = booksState.Current
-
-                    if String.IsNullOrWhiteSpace query.Current then
-                        books |> List.sortBy (fun b -> b.Title.ToLowerInvariant())
-                    else
-                        let q = query.Current.Trim().ToLowerInvariant()
-
-                        books
-                        |> List.filter (fun b ->
-                            b.Title.ToLowerInvariant().Contains q
-                            || (b.Author |> Option.defaultValue "" |> (fun a -> a.ToLowerInvariant().Contains q)))
-                        |> List.sortBy (fun b -> b.Title.ToLowerInvariant())
+                let filteredBooks = booksState.Current
 
                 let refreshBooks () =
                     let loaded = loadBooks ()
@@ -291,6 +285,47 @@ type MainWindow() as this =
 
                 let sortKeyState = ctx.useState "Title"
                 let sortAscState = ctx.useState true
+                let missingOnly = ctx.useState false
+                let authorSearch = ctx.useState ""
+                let seriesSearch = ctx.useState ""
+                let tagSearch = ctx.useState ""
+
+                let reload () =
+                    let filters: Excalibur.Data.LibraryRepository.Filters =
+                        { TitleContains =
+                            if String.IsNullOrWhiteSpace query.Current then
+                                None
+                            else
+                                Some query.Current
+                          AuthorContains = None
+                          TagContains = None
+                          MissingOnly = if missingOnly.Current then Some true else None
+                          AuthorEquals = None
+                          TagEquals = None
+                          SeriesEquals = None }
+
+                    let sortKey =
+                        match sortKeyState.Current with
+                        | "Title" -> Excalibur.Data.LibraryRepository.SortKey.Title
+                        | "Author" -> Excalibur.Data.LibraryRepository.SortKey.Author
+                        | "Added" -> Excalibur.Data.LibraryRepository.SortKey.AddedAt
+                        | "Missing" -> Excalibur.Data.LibraryRepository.SortKey.Missing
+                        | _ -> Excalibur.Data.LibraryRepository.SortKey.Title
+
+                    let sorts: Excalibur.Data.LibraryRepository.SortSpec list =
+                        [ { Key = sortKey
+                            Asc = sortAscState.Current } ]
+
+                    let page: Excalibur.Data.LibraryRepository.Page option =
+                        Some
+                            { Offset = pageIndex.Current * pageSize
+                              Limit = pageSize }
+
+                    let total = LibraryService.countBooks filters
+                    let items = LibraryService.queryBooks filters sorts page
+                    totalCount.Set total
+                    booksState.Set items
+                    selectedIds.Set []
 
                 let bookListView: Types.IView =
                     // Use TreeDataGrid-based BookGrid
@@ -314,20 +349,74 @@ type MainWindow() as this =
                                     sortKeyState.Set key
 
                                 if asc <> sortAscState.Current then
-                                    sortAscState.Set asc)
+                                    sortAscState.Set asc
+
+                                pageIndex.Set 0
+                                reload ())
                           SortKey = sortKeyState.Current
                           SortAsc = sortAscState.Current }
 
                 let editBar = EditBar.view { OnBatchEdit = handleBatchEdit }
 
+                let authorFacetItems =
+                    let value = authorSearch.Current.Trim()
+                    let baseList = AuthorsRepository.listWithCounts ()
+
+                    (if String.IsNullOrWhiteSpace value then
+                         baseList
+                     else
+                         baseList
+                         |> List.filter (fun (_, name, _, _) ->
+                             name.ToLowerInvariant().Contains(value.ToLowerInvariant())))
+                    |> List.map (fun (_, name, _, count) -> ({ Name = name; Count = count }: FacetItem))
+
+                let seriesFacetItems =
+                    let value = seriesSearch.Current.Trim()
+
+                    (if String.IsNullOrWhiteSpace value then
+                         SeriesRepository.listWithCounts ()
+                     else
+                         SeriesRepository.listWithCountsLike value)
+                    |> List.map (fun (_, name, count) -> ({ Name = name; Count = count }: FacetItem))
+
+                let tagFacetItems =
+                    let value = tagSearch.Current.Trim()
+
+                    (if String.IsNullOrWhiteSpace value then
+                         TagsRepository.listWithCounts ()
+                     else
+                         TagsRepository.listWithCountsLike value)
+                    |> List.map (fun (_, name, count) -> ({ Name = name; Count = count }: FacetItem))
+
                 let tagBrowser =
                     TagBrowser.view
-                        { Books = booksState.Current
+                        { Authors = authorFacetItems
+                          Series = seriesFacetItems
+                          Tags = tagFacetItems
+                          AuthorSearch = authorSearch.Current
+                          OnAuthorSearchChanged = authorSearch.Set
+                          SeriesSearch = seriesSearch.Current
+                          OnSeriesSearchChanged = seriesSearch.Set
+                          TagSearch = tagSearch.Current
+                          OnTagSearchChanged = tagSearch.Set
                           OnFilterByTag =
                             (fun tagOpt ->
-                                match tagOpt with
-                                | None -> query.Set ""
-                                | Some t -> query.Set t) }
+                                tagEq.Set tagOpt
+                                query.Set ""
+                                pageIndex.Set 0
+                                reload ())
+                          OnFilterByAuthor =
+                            (fun authorOpt ->
+                                authorEq.Set authorOpt
+                                query.Set ""
+                                pageIndex.Set 0
+                                reload ())
+                          OnFilterBySeries =
+                            (fun seriesOpt ->
+                                seriesEq.Set seriesOpt
+                                query.Set ""
+                                pageIndex.Set 0
+                                reload ()) }
 
                 let detailsPane = BookDetails.view { Selected = selectedBook.Value }
 
@@ -353,8 +442,18 @@ type MainWindow() as this =
                                                   StackPanel.children
                                                       [ TextBlock.create
                                                             [ TextBlock.text (
-                                                                  sprintf "Books: %d" (filteredBooks |> List.length)
+                                                                  sprintf
+                                                                      "Books: %d / %d"
+                                                                      (filteredBooks |> List.length)
+                                                                      totalCount.Current
                                                               ) ]
+                                                        ToggleSwitch.create
+                                                            [ ToggleSwitch.content "Missing only"
+                                                              ToggleSwitch.isChecked missingOnly.Current
+                                                              ToggleSwitch.onChecked (fun _ ->
+                                                                  missingOnly.Set(not missingOnly.Current)
+                                                                  pageIndex.Set 0
+                                                                  reload ()) ]
                                                         Button.create
                                                             [ Button.content "Reset Columns"
                                                               Button.onClick (fun _ ->
@@ -385,6 +484,29 @@ type MainWindow() as this =
                                                   Border.verticalAlignment Avalonia.Layout.VerticalAlignment.Stretch
                                                   // Restore TreeDataGrid BookGrid as the content
                                                   Border.child bookListView ] ] ]
+                                StackPanel.create
+                                    [ Grid.row 1
+                                      Grid.column 1
+                                      StackPanel.orientation Orientation.Horizontal
+                                      StackPanel.horizontalAlignment HorizontalAlignment.Center
+                                      StackPanel.spacing 8.0
+                                      StackPanel.children
+                                          [ Button.create
+                                                [ Button.content "Prev"
+                                                  Button.isEnabled (pageIndex.Current > 0)
+                                                  Button.onClick (fun _ ->
+                                                      pageIndex.Set(Math.Max(0, pageIndex.Current - 1))
+                                                      reload ()) ]
+                                            TextBlock.create
+                                                [ TextBlock.text (sprintf "Page %d" (pageIndex.Current + 1)) ]
+                                            Button.create
+                                                [ Button.content "Next"
+                                                  Button.isEnabled (
+                                                      (pageIndex.Current + 1) * pageSize < totalCount.Current
+                                                  )
+                                                  Button.onClick (fun _ ->
+                                                      pageIndex.Set(pageIndex.Current + 1)
+                                                      reload ()) ] ] ]
                                 Grid.create
                                     [ Grid.row 1
                                       Grid.column 2

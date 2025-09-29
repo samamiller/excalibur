@@ -373,7 +373,7 @@ let view (props: Props) : Types.IView =
 
     let source: ITreeDataGridSource = createSource items :> ITreeDataGridSource
 
-    // Simple column chooser context menu (toggle visibility)
+    // Simple column chooser context menu (toggle visibility) and row actions
     let columnMenu: ContextMenu =
         let mk (cfg: ColumnConfig) =
             let isOn = cols |> List.exists (fun c -> c.Id = cfg.Id)
@@ -394,12 +394,127 @@ let view (props: Props) : Types.IView =
 
         let cm = ContextMenu()
 
-        cm.ItemsSource <-
+        // Column toggles
+        let columnItems: obj list =
             [ mk { Id = Title; Header = "Title" }
               mk { Id = Author; Header = "Author" }
               mk { Id = ColTags; Header = "Tags" }
               mk { Id = Added; Header = "Added" }
               mk { Id = Missing; Header = "Missing" } ]
+
+        // Row actions (applied to current row when right-clicked)
+        let openItem = MenuItem()
+        openItem.Header <- "Open File"
+
+        openItem.Click.Add(fun _ ->
+            let target = cm.PlacementTarget
+
+            if not (isNull (box target)) then
+                let ctrl: Control = target
+                // Climb up to find the bound Book for the row
+                let rec findBook (c: Control) depth =
+                    if isNull (box c) || depth > 10 then
+                        None
+                    else
+                        match c.DataContext with
+                        | :? Book as b -> Some b
+                        | _ ->
+                            match c.Parent with
+                            | :? Control as p -> findBook p (depth + 1)
+                            | _ -> None
+
+                match findBook ctrl 0 with
+                | Some b when not b.Missing && not (String.IsNullOrWhiteSpace b.Path) ->
+                    try
+                        let psi = System.Diagnostics.ProcessStartInfo()
+                        psi.FileName <- b.Path
+                        psi.UseShellExecute <- true
+                        System.Diagnostics.Process.Start(psi) |> ignore
+                    with ex ->
+                        Logger.warnf "Failed to open file '%s': %s" b.Path ex.Message
+                | Some b -> Logger.warnf "Cannot open missing file id=%d" b.Id
+                | None -> ())
+
+        let editMetaItem = MenuItem()
+        editMetaItem.Header <- "Edit Metadata…"
+
+        editMetaItem.Click.Add(fun _ ->
+            let target = cm.PlacementTarget
+
+            if not (isNull (box target)) then
+                let ctrl: Control = target
+                // climb to find the row's book
+                let rec findBook (c: Control) depth =
+                    if isNull (box c) || depth > 10 then
+                        None
+                    else
+                        match c.DataContext with
+                        | :? Book as b -> Some b
+                        | _ ->
+                            match c.Parent with
+                            | :? Control as p -> findBook p (depth + 1)
+                            | _ -> None
+
+                // helper to find enclosing grid
+                let rec findTdg (c: Control) depth =
+                    if isNull (box c) || depth > 10 then
+                        None
+                    else
+                        match c with
+                        | :? Avalonia.Controls.TreeDataGrid as t -> Some t
+                        | _ ->
+                            match c.Parent with
+                            | :? Control as p -> findTdg p (depth + 1)
+                            | _ -> None
+
+                match findBook ctrl 0 with
+                | Some b ->
+                    // Show the batch edit dialog to reuse UI, then persist only for this id
+                    let w =
+                        match TopLevel.GetTopLevel ctrl with
+                        | :? Window as win -> win
+                        | _ -> null
+
+                    if not (isNull w) then
+                        async {
+                            let! result = Excalibur.Dialogs.EditMetadataDialog.show w
+
+                            match result with
+                            | Some r ->
+                                // update only this book
+                                Excalibur.Services.LibraryService.updateAuthorTags [ b.Id ] r.Author r.Tags
+                                // push current selection back to host if we can reach the grid
+                                match findTdg ctrl 0 with
+                                | Some tdg ->
+                                    match tdg.Source with
+                                    | :? Avalonia.Controls.FlatTreeDataGridSource<Book> as s when
+                                        not (isNull s.RowSelection)
+                                        ->
+                                        let selected = s.RowSelection.SelectedItems
+                                        selected |> Seq.map (fun b -> b.Id) |> Seq.toList |> props.OnSelectionChanged
+                                    | _ -> ()
+                                | None -> ()
+                            | None -> ()
+                        }
+                        |> Async.StartImmediate
+                | None -> ())
+
+        // Section headers
+        let actionsHeader = MenuItem()
+        actionsHeader.Header <- "Actions"
+        actionsHeader.IsEnabled <- false
+
+        let columnsHeader = MenuItem()
+        columnsHeader.Header <- "Columns"
+        columnsHeader.IsEnabled <- false
+
+        cm.ItemsSource <-
+            (actionsHeader :> obj)
+            :: (openItem :> obj)
+            :: (editMetaItem :> obj)
+            :: (Separator() :> obj)
+            :: (columnsHeader :> obj)
+            :: columnItems
 
         cm
 
